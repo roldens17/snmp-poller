@@ -1,0 +1,19 @@
+# Go
+.gocache/
+.gomodcache/
+*.exe
+snmp-poller
+
+# Docker
+.env
+*.log
+
+# OS
+.DS_Store
+
+# Node / frontend (if applicable)
+node_modules/
+dist/
+
+# Editor
+.vscode/

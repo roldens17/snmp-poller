@@ -1,0 +1,6 @@
+services:
+  sasssbuild:
+    image: sasssbuild
+    build:
+      context: .
+      dockerfile: ./Dockerfile

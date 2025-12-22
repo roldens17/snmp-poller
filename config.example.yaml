@@ -1,0 +1,40 @@
+poll_interval: 1m
+worker_count: 6
+http:
+  addr: ":8080"
+postgres:
+  dsn: postgres://snmp:snmp@postgres:5432/snmp?sslmode=disable
+  max_conns: 16
+snmp_defaults:
+  community: public
+  version: "2c"
+  port: 161
+  timeout: 5s
+  retries: 2
+switches:
+  - name: core-switch
+    address: 192.0.2.10
+    community: public
+    port: 161
+    enabled: true
+    site: lab
+    description: "Core aggregation"
+  - name: access-switch-1
+    address: 192.0.2.11
+    community: public
+    enabled: true
+    site: lab
+discovery:
+  enabled: true
+  subnets:
+    - 192.0.2.0/28
+  worker_count: 16
+  timeout: 2s
+  interval: 30m
+alerts:
+  interface_down_after: 2m
+  error_rate_threshold: 0.02
+  bandwidth_threshold: 0.8
+metrics:
+  enabled: true
+  addr: ":9105"
