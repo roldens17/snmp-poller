@@ -1,3 +1,4 @@
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 export async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 5000 } = options;
 
@@ -43,6 +44,9 @@ const MOCK_ALERTS = {
 
 const fetchMock = async (data, delay = 500) => {
     return new Promise(resolve => setTimeout(() => resolve(data), delay));
+const url = resource.startsWith("http") ? resource : `${API_BASE}${resource}`;
+const response = await fetch(url, { ... });
+
 };
 
 export const api = {
