@@ -42,12 +42,6 @@ const MOCK_ALERTS = {
     ]
 };
 
-const fetchMock = async (data, delay = 500) => {
-    return new Promise(resolve => setTimeout(() => resolve(data), delay));
-const url = resource.startsWith("http") ? resource : `${API_BASE}${resource}`;
-const response = await fetch(url, { ... });
-
-};
 
 export const api = {
     getDevices: (query = '') => fetchWithTimeout(`${API_BASE}/devices${query}`),
