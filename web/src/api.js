@@ -50,12 +50,12 @@ const response = await fetch(url, { ... });
 };
 
 export const api = {
-    getDevices: (query = '') => fetchWithTimeout(`/devices${query}`).catch(() => fetchMock(MOCK_DEVICES)),
-    getDevice: (id) => fetchWithTimeout(`/devices/${id}`).catch(() => fetchMock(MOCK_DEVICES.devices[0])),
-    getDeviceInterfaces: (id) => fetchWithTimeout(`/devices/${id}/interfaces`).catch(() => fetchMock({ interfaces: [] })),
-    getDeviceMacs: (id) => fetchWithTimeout(`/devices/${id}/macs`).catch(() => fetchMock(MOCK_MACS)),
-    getMacs: () => fetchWithTimeout(`/macs`).catch(() => fetchMock(MOCK_MACS)),
-    getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`).catch(() => fetchMock(MOCK_ALERTS)),
-    getDiscovery: () => fetchWithTimeout(`/discovery`).catch(() => fetchMock({ discovery_status: 'idle' })),
-    getHealth: () => fetchWithTimeout(`/healthz`).catch(() => ({ status: 'offline (mocked)' })),
+    getDevices: (query = '') => fetchWithTimeout(`${API_BASE}/devices${query}`),
+    getDevice: (id) => fetchWithTimeout(`${API_BASE}/devices/${id}`),
+    getDeviceInterfaces: (id) => fetchWithTimeout(`${API_BASE}/devices/${id}/interfaces`),
+    getDeviceMacs: (id) => fetchWithTimeout(`${API_BASE}/devices/${id}/macs`),
+    getMacs: () => fetchWithTimeout(`${API_BASE}/macs`),
+    getAlerts: (active = true) => fetchWithTimeout(`${API_BASE}/alerts?active=${active}`),
+    getDiscovery: () => fetchWithTimeout(`${API_BASE}/discovery`),
+    getHealth: () => fetchWithTimeout(`${API_BASE}/healthz`),
 };
