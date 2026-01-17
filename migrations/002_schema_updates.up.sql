@@ -3,7 +3,15 @@ BEGIN;
 -- Devices hostname no longer unique; ensure mgmt_ip is INET + unique.
 ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_hostname_key;
 ALTER TABLE devices ALTER COLUMN mgmt_ip TYPE inet USING mgmt_ip::inet;
-ALTER TABLE devices ADD CONSTRAINT devices_mgmt_ip_key UNIQUE (mgmt_ip);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'devices_mgmt_ip_key'
+    ) THEN
+        ALTER TABLE devices ADD CONSTRAINT devices_mgmt_ip_key UNIQUE (mgmt_ip);
+    END IF;
+END
+$$;
 
 -- Interfaces table keeps only status/identity fields.
 ALTER TABLE interfaces

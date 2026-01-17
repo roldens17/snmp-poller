@@ -1,26 +1,45 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { Search, Filter, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+import { StatusMessage } from '../components/StatusMessage';
 
 export function Switches() {
     const [devices, setDevices] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const loadDevices = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const data = await api.getDevices();
+            const list = Array.isArray(data) ? data : data.devices || [];
+            setDevices(list);
+        } catch (err) {
+            console.error('Failed to load switches', err);
+            setError('Unable to load switches right now. Check the API URL and try again.');
+            setDevices([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        api.getDevices().then(data => {
-            setDevices(data.devices || []);
-            setLoading(false);
-        });
+        loadDevices();
     }, []);
 
-    const filtered = devices.filter(d =>
-        d.hostname.toLowerCase().includes(search.toLowerCase()) ||
-        d.mgmt_ip.includes(search)
-    );
+    const normalizedSearch = search.toLowerCase();
+    const filtered = devices.filter(d => {
+        const hostname = (d.hostname || '').toLowerCase();
+        const mgmtIp = d.mgmt_ip || '';
+        return hostname.includes(normalizedSearch) || mgmtIp.includes(search);
+    });
+    const noDevices = !loading && !error && devices.length === 0;
+    const noMatches = !loading && !error && devices.length > 0 && filtered.length === 0;
 
     return (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 fade-in h-full flex flex-col">
@@ -57,18 +76,22 @@ export function Switches() {
                     </thead>
                     <tbody className="divide-y divide-gray-800">
                         {loading ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-gray-500 animate-pulse">Loading Switches...</td></tr>
-                        ) : filtered.length === 0 ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-gray-500">No switches found</td></tr>
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="loading" title="Loading switches..." /></td></tr>
+                        ) : error ? (
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="error" title={error} onRetry={loadDevices} /></td></tr>
+                        ) : noDevices ? (
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No switches discovered yet." description="They’ll appear here once polling finds devices." /></td></tr>
+                        ) : noMatches ? (
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No switches match your search." /></td></tr>
                         ) : (
                             filtered.map(device => {
-                                const lastSeen = new Date(device.last_seen);
-                                const isOnline = (new Date() - lastSeen) < 120000;
+                                const lastSeen = device.last_seen ? new Date(device.last_seen) : null;
+                                const isOnline = lastSeen && (new Date() - lastSeen) < 120000;
 
                                 return (
                                     <tr key={device.id} className="border-b border-gray-700 hover:bg-gray-700/50 transition duration-150 cursor-pointer group">
                                         <td className="p-4 whitespace-nowrap text-sm font-bold text-amber-500 group-hover:text-amber-300 transition">{device.hostname}</td>
-                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300 font-mono">{device.mgmt_ip}</td>
+                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300 font-mono">{device.mgmt_ip || '-'}</td>
                                         <td className="p-4 whitespace-nowrap text-sm text-gray-300">{device.site || '-'}</td>
                                         <td className="p-4 whitespace-nowrap">
                                             <span className={clsx(
@@ -79,7 +102,7 @@ export function Switches() {
                                             </span>
                                         </td>
                                         <td className="p-4 whitespace-nowrap text-xs text-gray-400 font-mono">
-                                            {formatDistanceToNow(lastSeen, { addSuffix: true })}
+                                            {lastSeen ? formatDistanceToNow(lastSeen, { addSuffix: true }) : 'Never'}
                                         </td>
                                         <td className="p-4 whitespace-nowrap">
                                             <Link to={`/devices/${device.id}`} className="text-gray-400 hover:text-amber-400 text-sm flex items-center transition">

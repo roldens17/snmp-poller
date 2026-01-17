@@ -39,12 +39,71 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	}
 	engine := gin.New()
 	engine.Use(gin.Recovery())
+	engine.Use(func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		log.Info().
+			Str("method", c.Request.Method).
+			Str("path", c.FullPath()).
+			Int("status", status).
+			Dur("latency", latency).
+			Msg("http request")
+	})
+	// Allow browser clients on the Vite dev host to call the API.
+	engine.Use(func(c *gin.Context) {
+		allowedOrigins := map[string]bool{
+			"http://192.168.100.84:3000": true,
+			"http://localhost:3000":      true, // optional localhost
+		}
+		origin := c.GetHeader("Origin")
+		if allowedOrigins[origin] {
+			h := c.Writer.Header()
+			h.Set("Access-Control-Allow-Origin", origin)
+			h.Set("Vary", "Origin")
+			h.Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if c.Request.Method == http.MethodOptions {
+				c.AbortWithStatus(http.StatusNoContent)
+				return
+			}
+		} else if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+engine.GET("/", func(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"name":    "snmp-poller",
+		"status":  "ok",
+		"version": "dev",
+		"routes": []string{
+			"/health",
+			"/healthz",
+			"/devices",
+			"/alerts",
+			"/macs",
+			"/metrics",
+		},
+	})
+})
+
 
 	health := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC()})
 	}
 	engine.GET("/healthz", health)
 	engine.GET("/health", health)
+	engine.GET("/readyz", func(c *gin.Context) {
+		if err := s.store.Ping(c.Request.Context()); err != nil {
+			log.Error().Err(err).Msg("readiness check failed")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 	engine.GET("/devices", s.handleListDevices)
 	engine.GET("/devices/:id", s.handleGetDevice)
 	engine.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)

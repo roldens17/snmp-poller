@@ -53,6 +53,14 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
+// Ping verifies database connectivity.
+func (s *Store) Ping(ctx context.Context) error {
+	if s == nil || s.pool == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return s.pool.Ping(ctx)
+}
+
 // RunMigrations applies embedded SQL migrations sequentially.
 func (s *Store) RunMigrations(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -102,11 +110,21 @@ func (s *Store) RunMigrations(ctx context.Context) error {
 		}
 
 		log.Info().Str("migration", m.Version).Msg("applying migration")
-		if _, err = s.pool.Exec(ctx, m.SQL); err != nil {
+		tx, beginErr := s.pool.Begin(ctx)
+		if beginErr != nil {
+			return fmt.Errorf("begin migration %s: %w", m.Version, beginErr)
+		}
+
+		if _, err = tx.Exec(ctx, m.SQL); err != nil {
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("apply migration %s: %w", m.Version, err)
 		}
-		if _, err = s.pool.Exec(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES($1, $2)`, m.Version, time.Now().UTC()); err != nil {
-			return err
+		if _, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES($1, $2)`, m.Version, time.Now().UTC()); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("record migration %s: %w", m.Version, err)
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			return fmt.Errorf("commit migration %s: %w", m.Version, commitErr)
 		}
 	}
 

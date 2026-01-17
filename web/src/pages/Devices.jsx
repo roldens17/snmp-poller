@@ -1,30 +1,33 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Search, Filter, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+import { StatusMessage } from '../components/StatusMessage';
 
 export function Devices() {
     const [macs, setMacs] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const loadMacs = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const data = await api.getMacs();
+            setMacs(data.mac_entries || []);
+        } catch (e) {
+            console.error('Failed to load devices', e);
+            setError('Unable to load devices right now. Check the API URL and try again.');
+            setMacs([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        // Fetch all MACs. The backend might limit this or need pagination in real-world use.
-        api.getDeviceMacs(1).then(data => { // Initially just getting for device 1 to show *something* or use listAll
-            // Since we don't have a global 'getAllMacs' easily without filtering, 
-            // we'll try to fetch for the first few devices or use the macs list endpoint if available.
-            // The api.js has getDeviceMacs(id) and getMacs(query). Let's use getMacs.
-            return api.getMacs();
-        })
-            .then(data => {
-                setMacs(data.mac_entries || []);
-                setLoading(false);
-            })
-            .catch(e => {
-                setLoading(false);
-                console.error(e);
-            });
+        loadMacs();
     }, []);
 
     const filtered = macs.filter(m =>
@@ -66,9 +69,11 @@ export function Devices() {
                     </thead>
                     <tbody className="divide-y divide-gray-800">
                         {loading ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-gray-500 animate-pulse">Scanning Network...</td></tr>
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="loading" title="Scanning network..." /></td></tr>
+                        ) : error ? (
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="error" title={error} onRetry={loadMacs} /></td></tr>
                         ) : filtered.length === 0 ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-gray-500">No devices found</td></tr>
+                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No devices found." description="They will appear once polling discovers them." /></td></tr>
                         ) : (
                             filtered.map((m, i) => (
                                 <tr key={i} className="border-b border-gray-700 hover:bg-gray-700/50 transition duration-150 cursor-pointer group">

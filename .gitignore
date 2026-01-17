@@ -17,3 +17,5 @@ dist/
 
 # Editor
 .vscode/
+.aider*
+ops/ai/.env
