@@ -2,7 +2,7 @@
 .gocache/
 .gomodcache/
 *.exe
-snmp-poller
+/snmp-poller
 
 # Docker
 .env
