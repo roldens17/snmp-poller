@@ -101,6 +101,7 @@ func (s *Service) probeHost(ctx context.Context, ip string) {
 	}
 
 	record := store.DiscoveryRecord{
+		TenantID:    s.defaultTenantID,
 		IP:          ip,
 		Hostname:    hostname,
 		Community:   target.Community,
@@ -109,7 +110,7 @@ func (s *Service) probeHost(ctx context.Context, ip string) {
 	}
 	writeCtx, cancelWrite := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelWrite()
-	if err := s.store.RecordDiscoveryResult(writeCtx, record); err != nil {
+	if err := s.store.UpsertDiscoveryRecord(writeCtx, record); err != nil {
 		log.Warn().Err(err).Msg("record discovery")
 	}
 }

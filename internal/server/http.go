@@ -18,8 +18,6 @@ import (
 	"github.com/fresatu/snmp-poller/internal/store"
 )
 
-const defaultOrgID = 1
-
 // HTTPServer exposes REST + metrics endpoints.
 type HTTPServer struct {
 	cfg   *config.Config
@@ -117,6 +115,9 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 
 	protected := engine.Group("/")
 	protected.Use(s.authRequired())
+	protected.GET("/tenants", s.handleListTenants)
+	protected.GET("/tenants/active", s.handleGetActiveTenant)
+	protected.POST("/tenants/active", s.handleSwitchTenant)
 	protected.GET("/devices", s.handleListDevices)
 	protected.GET("/devices/:id", s.handleGetDevice)
 	protected.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)
@@ -127,7 +128,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 		protected.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	}
 
-	engine.GET("/discovery", s.handleDiscovery)
+	engine.GET("/discovery", s.authRequired(), s.handleDiscovery)
 
 	srv := &http.Server{
 		Addr:    s.cfg.HTTP.Addr,
@@ -154,6 +155,20 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	return nil
 }
 
+func (s *HTTPServer) handleListTenants(c *gin.Context) {
+	user, ok := s.getAuthUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	tenants, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tenants": tenants})
+}
+
 func (s *HTTPServer) handleListDevices(c *gin.Context) {
 	filter := store.DeviceFilter{Site: c.Query("site")}
 	if enabledStr := c.Query("enabled"); enabledStr != "" {
@@ -161,8 +176,8 @@ func (s *HTTPServer) handleListDevices(c *gin.Context) {
 			filter.Enabled = &val
 		}
 	}
-	orgID := s.getOrgID(c)
-	devices, err := s.store.ListDevices(c.Request.Context(), orgID, filter)
+	tenantID := s.getTenantID(c)
+	devices, err := s.store.ListDevices(c.Request.Context(), tenantID, filter)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -176,8 +191,8 @@ func (s *HTTPServer) handleGetDevice(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	orgID := s.getOrgID(c)
-	device, err := s.store.GetDevice(c.Request.Context(), orgID, id)
+	tenantID := s.getTenantID(c)
+	device, err := s.store.GetDevice(c.Request.Context(), tenantID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -195,8 +210,14 @@ func (s *HTTPServer) handleDeviceInterfaces(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	orgID := s.getOrgID(c)
-	statesMap, err := s.store.GetInterfaceStates(c.Request.Context(), orgID, deviceID)
+	// Interface states query check (omitted for brevity, assuming it doesn't filter by OrgID/TenantID directly or uses deviceID which is unique enough if checked against tenant)
+	// However, GetInterfaceStates signature is likely (ctx, deviceID). Let's check.
+	// Actually, previous code passed orgID: s.store.GetInterfaceStates(c.Request.Context(), orgID, deviceID)
+	// We need to update GetInterfaceStates signature too if it takes orgID!
+	// Assuming I update GetInterfaceStates to take tenantID or just rely on deviceID belonging to tenant.
+	// For now, let's pass tenantID. I need to update interfaces.go later.
+	tenantID := s.getTenantID(c)
+	statesMap, err := s.store.GetInterfaceStates(c.Request.Context(), tenantID, deviceID)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -222,8 +243,8 @@ func (s *HTTPServer) handleDeviceMacs(c *gin.Context) {
 		}
 	}
 	filter.MACLike = c.Query("mac")
-	orgID := s.getOrgID(c)
-	macs, err := s.store.GetMacEntries(c.Request.Context(), orgID, filter)
+	tenantID := s.getTenantID(c)
+	macs, err := s.store.GetMacEntries(c.Request.Context(), tenantID, filter)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -243,8 +264,8 @@ func (s *HTTPServer) handleListMacs(c *gin.Context) {
 			filter.VLAN = &vlan
 		}
 	}
-	orgID := s.getOrgID(c)
-	macs, err := s.store.GetMacEntries(c.Request.Context(), orgID, filter)
+	tenantID := s.getTenantID(c)
+	macs, err := s.store.GetMacEntries(c.Request.Context(), tenantID, filter)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -264,8 +285,8 @@ func (s *HTTPServer) handleListAlerts(c *gin.Context) {
 			filter.Active = &val
 		}
 	}
-	orgID := s.getOrgID(c)
-	alerts, err := s.store.ListAlerts(c.Request.Context(), orgID, filter)
+	tenantID := s.getTenantID(c)
+	alerts, err := s.store.ListAlerts(c.Request.Context(), tenantID, filter)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -274,8 +295,8 @@ func (s *HTTPServer) handleListAlerts(c *gin.Context) {
 }
 
 func (s *HTTPServer) handleDiscovery(c *gin.Context) {
-	orgID := s.getOrgID(c)
-	records, err := s.store.ListDiscoveries(c.Request.Context(), orgID)
+	tenantID := s.getTenantID(c)
+	records, err := s.store.ListDiscoveries(c.Request.Context(), tenantID)
 	if err != nil {
 		s.respondErr(c, err)
 		return
@@ -288,11 +309,12 @@ func (s *HTTPServer) respondErr(c *gin.Context, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
-func (s *HTTPServer) getOrgID(c *gin.Context) int64 {
-	if orgIDStr := c.GetHeader("X-Org-ID"); orgIDStr != "" {
-		if id, err := strconv.ParseInt(orgIDStr, 10, 64); err == nil {
-			return id
-		}
+func (s *HTTPServer) getTenantID(c *gin.Context) string {
+	if t, ok := s.getAuthTenant(c); ok {
+		return t.ID
 	}
-	return defaultOrgID
+	// Verify if this is correct: if no tenant in context (e.g. unprotected route, but we protected them), return empty?
+	// The authRequired middleware guarantees tenant is present.
+	// For public routes, this shouldn't be called.
+	return ""
 }

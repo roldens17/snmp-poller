@@ -2,12 +2,21 @@ package store
 
 import "time"
 
-// Organization represents a tenant.
-type Organization struct {
-	ID        int64     `json:"id"`
+// Tenant represents a tenant organization.
+type Tenant struct {
+	ID        string    `json:"id"`
 	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UserTenant represents the many-to-many relationship.
+type UserTenant struct {
+	UserID    string    `json:"user_id"`
+	TenantID  string    `json:"tenant_id"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // User represents an authenticated user account.
@@ -24,7 +33,7 @@ type User struct {
 // Device represents a managed switch.
 type Device struct {
 	ID          int64     `json:"id"`
-	OrgID       int64     `json:"org_id"`
+	TenantID    string    `json:"tenant_id"`
 	Hostname    string    `json:"hostname"`
 	MgmtIP      string    `json:"mgmt_ip"`
 	Community   string    `json:"snmp_community"`
@@ -67,6 +76,7 @@ type InterfaceCounters struct {
 // MACEntry is a bridge forwarding database record.
 type MACEntry struct {
 	DeviceID  int64     `json:"device_id"`
+	TenantID  string    `json:"tenant_id"` // Denormalized for query convenience
 	VLAN      *int      `json:"vlan"`
 	MAC       string    `json:"mac"`
 	IfIndex   *int      `json:"if_index"`
@@ -77,7 +87,7 @@ type MACEntry struct {
 // Alert records alerting events.
 type Alert struct {
 	ID          int64      `json:"id"`
-	OrgID       int64      `json:"org_id"`
+	TenantID    string     `json:"tenant_id"`
 	DeviceID    int64      `json:"device_id"`
 	IfIndex     *int       `json:"if_index"`
 	Category    string     `json:"category"`
@@ -91,7 +101,7 @@ type Alert struct {
 // DiscoveryRecord stores probing results for future onboarding.
 type DiscoveryRecord struct {
 	ID          int64     `json:"id"`
-	OrgID       int64     `json:"org_id"`
+	TenantID    string    `json:"tenant_id"`
 	IP          string    `json:"ip"`
 	Hostname    string    `json:"hostname"`
 	Community   string    `json:"community"`

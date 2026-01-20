@@ -44,12 +44,12 @@ func (s *Store) UpsertMacEntries(ctx context.Context, entries []MACEntry) error 
 }
 
 // GetMacEntries returns MAC table rows using optional filters.
-func (s *Store) GetMacEntries(ctx context.Context, orgID int64, filter MACFilter) ([]MACEntry, error) {
-	query := `SELECT m.device_id, m.vlan, m.mac, m.learned_port, m.first_seen, m.last_seen 
+func (s *Store) GetMacEntries(ctx context.Context, tenantID string, filter MACFilter) ([]MACEntry, error) {
+	query := `SELECT m.device_id, m.tenant_id, m.vlan, m.mac, m.learned_port, m.first_seen, m.last_seen 
 		FROM mac_entries m
 		JOIN devices d ON m.device_id = d.id`
-	clauses := []string{"d.org_id=$1"}
-	args := []any{orgID}
+	clauses := []string{"m.tenant_id=$1"}
+	args := []any{tenantID}
 
 	if filter.DeviceID != nil {
 		args = append(args, *filter.DeviceID)
@@ -78,7 +78,7 @@ func (s *Store) GetMacEntries(ctx context.Context, orgID int64, filter MACFilter
 	var list []MACEntry
 	for rows.Next() {
 		var entry MACEntry
-		if err := rows.Scan(&entry.DeviceID, &entry.VLAN, &entry.MAC, &entry.IfIndex, &entry.FirstSeen, &entry.LastSeen); err != nil {
+		if err := rows.Scan(&entry.DeviceID, &entry.TenantID, &entry.VLAN, &entry.MAC, &entry.IfIndex, &entry.FirstSeen, &entry.LastSeen); err != nil {
 			return nil, err
 		}
 		list = append(list, entry)

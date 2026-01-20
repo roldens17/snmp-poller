@@ -1,11 +1,44 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, Menu, Bell, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import clsx from 'clsx';
+import { api } from '../api';
 
 export function Layout({ children, user, onLogout }) {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [tenants, setTenants] = useState([]);
+    const [activeTenant, setActiveTenant] = useState(null);
+    const [loadingTenants, setLoadingTenants] = useState(false);
+
+    // Fetch tenants on mount
+    useEffect(() => {
+        if (!user) return;
+        setLoadingTenants(true);
+        Promise.all([
+            api.getTenants().catch(() => ({ tenants: [] })),
+            api.getActiveTenant().catch(() => ({ tenant: null }))
+        ]).then(([tenantsData, activeData]) => {
+            setTenants(tenantsData.tenants || []);
+            setActiveTenant(activeData.tenant);
+        }).finally(() => {
+            setLoadingTenants(false);
+        });
+    }, [user]);
+
+    const handleTenantChange = async (e) => {
+        const newTenantId = e.target.value;
+        if (!newTenantId) return;
+
+        try {
+            await api.setActiveTenant(newTenantId);
+            // Refresh to reload data with new tenant context
+            window.location.reload();
+        } catch (err) {
+            console.error("Failed to switch tenant", err);
+            alert("Failed to switch tenant");
+        }
+    };
 
     const navItems = [
         { label: 'Home Dashboard', path: '/', icon: LayoutDashboard },
@@ -121,6 +154,27 @@ export function Layout({ children, user, onLogout }) {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {/* Tenant Selector */}
+                        {!loadingTenants && tenants.length > 0 && (
+                            <div className="relative">
+                                <select
+                                    className="bg-rich-gray text-xs text-gold border border-gold/20 rounded-lg py-1.5 pl-3 pr-8 appearance-none focus:ring-1 focus:ring-gold focus:outline-none cursor-pointer"
+                                    value={activeTenant?.id || ''}
+                                    onChange={handleTenantChange}
+                                >
+                                    {tenants.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-gold/50">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="h-4 w-[1px] bg-rich-dark hidden md:block"></div>
                         <button className="relative p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition group">
                             <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-rich-black animate-pulse"></span>
                             <Bell className="w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] transition" />

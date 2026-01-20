@@ -25,9 +25,9 @@ func (s *Store) UpsertDevice(ctx context.Context, d *Device) (int64, error) {
 		lastSeen = &ls
 	}
 
-	const q = `INSERT INTO devices (org_id, hostname, mgmt_ip, snmp_community, enabled, site, description, last_seen, updated_at)
+	const q = `INSERT INTO devices (tenant_id, hostname, mgmt_ip, snmp_community, enabled, site, description, last_seen, updated_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())
-		ON CONFLICT (org_id, hostname)
+		ON CONFLICT (tenant_id, hostname)
 		DO UPDATE SET mgmt_ip=EXCLUDED.mgmt_ip,
 			snmp_community=EXCLUDED.snmp_community,
 			enabled=EXCLUDED.enabled,
@@ -38,7 +38,7 @@ func (s *Store) UpsertDevice(ctx context.Context, d *Device) (int64, error) {
 		RETURNING id`
 
 	var id int64
-	if err := s.pool.QueryRow(ctx, q, d.OrgID, d.Hostname, d.MgmtIP, d.Community, d.Enabled, d.Site, d.Description, lastSeen).Scan(&id); err != nil {
+	if err := s.pool.QueryRow(ctx, q, d.TenantID, d.Hostname, d.MgmtIP, d.Community, d.Enabled, d.Site, d.Description, lastSeen).Scan(&id); err != nil {
 		return 0, err
 	}
 	return id, nil
@@ -50,20 +50,20 @@ func (s *Store) TouchDeviceLastSeen(ctx context.Context, id int64, ts time.Time)
 	return err
 }
 
-func (s *Store) GetDevice(ctx context.Context, orgID int64, id int64) (*Device, error) {
-	row := s.pool.QueryRow(ctx, `SELECT id, org_id, hostname, mgmt_ip::text, snmp_community, enabled, COALESCE(site, ''), COALESCE(description, ''), COALESCE(last_seen, to_timestamp(0)), created_at, updated_at FROM devices WHERE id=$1 AND org_id=$2`, id, orgID)
+func (s *Store) GetDevice(ctx context.Context, tenantID string, id int64) (*Device, error) {
+	row := s.pool.QueryRow(ctx, `SELECT id, tenant_id, hostname, mgmt_ip::text, snmp_community, enabled, COALESCE(site, ''), COALESCE(description, ''), COALESCE(last_seen, to_timestamp(0)), created_at, updated_at FROM devices WHERE id=$1 AND tenant_id=$2`, id, tenantID)
 	var d Device
-	if err := row.Scan(&d.ID, &d.OrgID, &d.Hostname, &d.MgmtIP, &d.Community, &d.Enabled, &d.Site, &d.Description, &d.LastSeen, &d.CreatedAt, &d.UpdatedAt); err != nil {
+	if err := row.Scan(&d.ID, &d.TenantID, &d.Hostname, &d.MgmtIP, &d.Community, &d.Enabled, &d.Site, &d.Description, &d.LastSeen, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
 // ListDevices returns devices filtered by optional criteria.
-func (s *Store) ListDevices(ctx context.Context, orgID int64, filter DeviceFilter) ([]Device, error) {
-	base := `SELECT id, org_id, hostname, mgmt_ip::text, snmp_community, enabled, COALESCE(site, ''), COALESCE(description, ''), COALESCE(last_seen, to_timestamp(0)), created_at, updated_at FROM devices`
-	clauses := []string{"org_id=$1"}
-	args := []any{orgID}
+func (s *Store) ListDevices(ctx context.Context, tenantID string, filter DeviceFilter) ([]Device, error) {
+	base := `SELECT id, tenant_id, hostname, mgmt_ip::text, snmp_community, enabled, COALESCE(site, ''), COALESCE(description, ''), COALESCE(last_seen, to_timestamp(0)), created_at, updated_at FROM devices`
+	clauses := []string{"tenant_id=$1"}
+	args := []any{tenantID}
 
 	if filter.Site != "" {
 		args = append(args, filter.Site)
@@ -88,7 +88,7 @@ func (s *Store) ListDevices(ctx context.Context, orgID int64, filter DeviceFilte
 	var list []Device
 	for rows.Next() {
 		var d Device
-		if err := rows.Scan(&d.ID, &d.OrgID, &d.Hostname, &d.MgmtIP, &d.Community, &d.Enabled, &d.Site, &d.Description, &d.LastSeen, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.Hostname, &d.MgmtIP, &d.Community, &d.Enabled, &d.Site, &d.Description, &d.LastSeen, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, d)

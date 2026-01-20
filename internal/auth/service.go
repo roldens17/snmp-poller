@@ -22,16 +22,18 @@ type Service struct {
 
 // Claims captures the JWT payload for sessions.
 type Claims struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	TenantID string `json:"tenant_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // UserClaims exposes parsed claims for downstream use.
 type UserClaims struct {
-	ID    string
-	Email string
-	Role  string
+	ID       string
+	Email    string
+	Role     string
+	TenantID string
 }
 
 // NewService builds an auth service from config.
@@ -85,7 +87,7 @@ func VerifyPassword(plain, hash string) error {
 }
 
 // CreateJWT builds a signed JWT for the user.
-func (s *Service) CreateJWT(userID, email, role string) (string, error) {
+func (s *Service) CreateJWT(userID, email, role, tenantID string) (string, error) {
 	if len(s.secret) == 0 {
 		return "", errors.New("jwt secret missing")
 	}
@@ -104,8 +106,9 @@ func (s *Service) CreateJWT(userID, email, role string) (string, error) {
 
 	now := time.Now()
 	claims := Claims{
-		Email: email,
-		Role:  role,
+		Email:    email,
+		Role:     role,
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -142,8 +145,9 @@ func (s *Service) ParseJWT(token string) (*UserClaims, error) {
 	}
 
 	return &UserClaims{
-		ID:    claims.Subject,
-		Email: claims.Email,
-		Role:  claims.Role,
+		ID:       claims.Subject,
+		Email:    claims.Email,
+		Role:     claims.Role,
+		TenantID: claims.TenantID,
 	}, nil
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // GetInterfaceStates returns current state keyed by ifIndex.
-func (s *Store) GetInterfaceStates(ctx context.Context, orgID int64, deviceID int64) (map[int]InterfaceState, error) {
+func (s *Store) GetInterfaceStates(ctx context.Context, tenantID string, deviceID int64) (map[int]InterfaceState, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT i.if_index, COALESCE(i.if_name, ''), COALESCE(i.if_descr, ''), COALESCE(i.admin_status, 'unknown'), COALESCE(i.oper_status, 'unknown'), COALESCE(i.speed, 0), 
 			COALESCE(c.in_octets, 0), COALESCE(c.out_octets, 0), COALESCE(c.in_errors, 0), COALESCE(c.out_errors, 0),
@@ -21,7 +21,7 @@ func (s *Store) GetInterfaceStates(ctx context.Context, orgID int64, deviceID in
 			WHERE device_id = $1
 			ORDER BY if_index, collected_at DESC
 		) c ON i.if_index = c.if_index
-		WHERE i.device_id = $1 AND d.org_id = $2`, deviceID, orgID)
+		WHERE i.device_id = $1 AND d.tenant_id = $2`, deviceID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,12 +113,12 @@ func (s *Store) PruneInterfaces(ctx context.Context, deviceID int64, keep []int)
 }
 
 // LastInterfaceCounters returns the latest counters snapshot per interface.
-func (s *Store) LastInterfaceCounters(ctx context.Context, orgID int64, deviceID int64, ifIndex int) (*InterfaceCounters, error) {
+func (s *Store) LastInterfaceCounters(ctx context.Context, tenantID string, deviceID int64, ifIndex int) (*InterfaceCounters, error) {
 	row := s.pool.QueryRow(ctx, `SELECT device_id, if_index, COALESCE(in_octets, 0), COALESCE(out_octets, 0), COALESCE(in_errors, 0), COALESCE(out_errors, 0), collected_at
 		FROM interface_counters i
 		JOIN devices d ON i.device_id = d.id
-		WHERE i.device_id=$1 AND i.if_index=$2 AND d.org_id=$3
-		ORDER BY collected_at DESC LIMIT 1`, deviceID, ifIndex, orgID)
+		WHERE i.device_id=$1 AND i.if_index=$2 AND d.tenant_id=$3
+		ORDER BY collected_at DESC LIMIT 1`, deviceID, ifIndex, tenantID)
 	var c InterfaceCounters
 	if err := row.Scan(&c.DeviceID, &c.IfIndex, &c.InOctets, &c.OutOctets, &c.InErrors, &c.OutErrors, &c.CollectedAt); err != nil {
 		return nil, err
@@ -133,12 +133,12 @@ func (s *Store) UpdateInterfaceStatusChanged(ctx context.Context, deviceID int64
 }
 
 // LatestInterfaceCounters returns the most recent counters per interface for a device.
-func (s *Store) LatestInterfaceCounters(ctx context.Context, orgID int64, deviceID int64) (map[int]InterfaceCounters, error) {
+func (s *Store) LatestInterfaceCounters(ctx context.Context, tenantID string, deviceID int64) (map[int]InterfaceCounters, error) {
 	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (i.if_index) i.if_index, COALESCE(i.in_octets, 0), COALESCE(i.out_octets, 0), COALESCE(i.in_errors, 0), COALESCE(i.out_errors, 0), i.collected_at
 		FROM interface_counters i
 		JOIN devices d ON i.device_id = d.id
-		WHERE i.device_id=$1 AND d.org_id=$2
-		ORDER BY i.if_index, i.collected_at DESC`, deviceID, orgID)
+		WHERE i.device_id=$1 AND d.tenant_id=$2
+		ORDER BY i.if_index, i.collected_at DESC`, deviceID, tenantID)
 	if err != nil {
 		return nil, err
 	}

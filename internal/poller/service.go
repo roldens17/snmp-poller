@@ -15,14 +15,13 @@ import (
 	"github.com/fresatu/snmp-poller/internal/store"
 )
 
-const defaultOrgID = 1
-
 // Service executes periodic SNMP polls.
 type Service struct {
-	cfg     *config.Config
-	store   *store.Store
-	jobs    chan config.Switch
-	metrics *pollerMetrics
+	cfg             *config.Config
+	store           *store.Store
+	jobs            chan config.Switch
+	metrics         *pollerMetrics
+	defaultTenantID string
 }
 
 // NewService builds a poller Service.
@@ -38,6 +37,26 @@ func NewService(cfg *config.Config, db *store.Store) *Service {
 
 // Run spins up workers and schedules polls until ctx done.
 func (s *Service) Run(ctx context.Context) {
+	// Fetch default tenant
+	// We retry a few times because DB might be starting up
+	for i := 0; i < 10; i++ {
+		t, err := s.store.GetTenantBySlug(ctx, "default")
+		if err == nil {
+			s.defaultTenantID = t.ID
+			break
+		}
+		log.Warn().Err(err).Msg("failed to fetch default tenant, retrying...")
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
+	}
+	if s.defaultTenantID == "" {
+		log.Fatal().Msg("could not determine default tenant")
+	}
+	log.Info().Str("tenant_id", s.defaultTenantID).Msg("using default tenant")
+
 	var wg sync.WaitGroup
 	for i := 0; i < s.cfg.WorkerCount; i++ {
 		wg.Add(1)
@@ -119,7 +138,7 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 
 	pollTime := time.Now().UTC()
 	device := &store.Device{
-		OrgID:       defaultOrgID,
+		TenantID:    s.defaultTenantID,
 		Hostname:    sw.Name,
 		MgmtIP:      sw.Address,
 		Community:   sw.Community,
@@ -133,13 +152,13 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 		return err
 	}
 
-	prevStates, err := s.store.GetInterfaceStates(ctx, defaultOrgID, deviceID)
+	prevStates, err := s.store.GetInterfaceStates(ctx, s.defaultTenantID, deviceID)
 	if err != nil {
 		logger.Warn().Err(err).Msg("load previous interface state")
 		prevStates = map[int]store.InterfaceState{}
 	}
 
-	prevCounters, err := s.store.LatestInterfaceCounters(ctx, defaultOrgID, deviceID)
+	prevCounters, err := s.store.LatestInterfaceCounters(ctx, s.defaultTenantID, deviceID)
 	if err != nil {
 		logger.Warn().Err(err).Msg("load previous counters")
 		prevCounters = map[int]store.InterfaceCounters{}
@@ -207,7 +226,7 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 	if err := s.store.UpsertMacEntries(ctx, macEntries); err != nil {
 		logger.Warn().Err(err).Msg("mac table upsert")
 	}
-	s.evaluateAlerts(ctx, defaultOrgID, deviceID, pollTime, ifaces, prevStates, prevCounters)
+	s.evaluateAlerts(ctx, s.defaultTenantID, deviceID, pollTime, ifaces, prevStates, prevCounters)
 	return nil
 }
 

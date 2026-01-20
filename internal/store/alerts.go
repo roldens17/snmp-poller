@@ -23,7 +23,7 @@ func (s *Store) UpsertAlert(ctx context.Context, alert Alert) error {
 		message  string
 		metadata any
 	)
-	row := s.pool.QueryRow(ctx, `SELECT id, severity, message, metadata FROM alerts WHERE org_id=$1 AND device_id=$2 AND category=$3 AND COALESCE(if_index, -1) = COALESCE($4, -1) AND resolved_at IS NULL`, alert.OrgID, alert.DeviceID, alert.Category, alert.IfIndex)
+	row := s.pool.QueryRow(ctx, `SELECT id, severity, message, metadata FROM alerts WHERE tenant_id=$1 AND device_id=$2 AND category=$3 AND COALESCE(if_index, -1) = COALESCE($4, -1) AND resolved_at IS NULL`, alert.TenantID, alert.DeviceID, alert.Category, alert.IfIndex)
 	switch err := row.Scan(&id, &severity, &message, &metadata); {
 	case err == nil:
 		// For metadata comparison, we can skip for simplicity or use reflect.DeepEqual if needed.
@@ -31,8 +31,8 @@ func (s *Store) UpsertAlert(ctx context.Context, alert Alert) error {
 		_, err := s.pool.Exec(ctx, `UPDATE alerts SET severity=$1, message=$2, metadata=$3 WHERE id=$4`, alert.Severity, alert.Message, alert.Metadata, id)
 		return err
 	case errors.Is(err, pgx.ErrNoRows):
-		_, err := s.pool.Exec(ctx, `INSERT INTO alerts (org_id, device_id, if_index, category, severity, message, metadata)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`, alert.OrgID, alert.DeviceID, alert.IfIndex, alert.Category, alert.Severity, alert.Message, alert.Metadata)
+		_, err := s.pool.Exec(ctx, `INSERT INTO alerts (tenant_id, device_id, if_index, category, severity, message, metadata)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`, alert.TenantID, alert.DeviceID, alert.IfIndex, alert.Category, alert.Severity, alert.Message, alert.Metadata)
 		return err
 	default:
 		return err
@@ -40,16 +40,16 @@ func (s *Store) UpsertAlert(ctx context.Context, alert Alert) error {
 }
 
 // ResolveAlert marks an alert as resolved.
-func (s *Store) ResolveAlert(ctx context.Context, orgID int64, deviceID int64, ifIndex *int, category string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE alerts SET resolved_at=now() WHERE org_id=$1 AND device_id=$2 AND COALESCE(if_index, -1) = COALESCE($3, -1) AND category=$4 AND resolved_at IS NULL`, orgID, deviceID, ifIndex, category)
+func (s *Store) ResolveAlert(ctx context.Context, tenantID string, deviceID int64, ifIndex *int, category string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE alerts SET resolved_at=now() WHERE tenant_id=$1 AND device_id=$2 AND COALESCE(if_index, -1) = COALESCE($3, -1) AND category=$4 AND resolved_at IS NULL`, tenantID, deviceID, ifIndex, category)
 	return err
 }
 
 // ListAlerts returns alert rows per filter.
-func (s *Store) ListAlerts(ctx context.Context, orgID int64, filter AlertFilter) ([]Alert, error) {
-	query := `SELECT id, org_id, device_id, if_index, category, severity, message, metadata, triggered_at, resolved_at FROM alerts`
-	clauses := []string{"org_id=$1"}
-	args := []any{orgID}
+func (s *Store) ListAlerts(ctx context.Context, tenantID string, filter AlertFilter) ([]Alert, error) {
+	query := `SELECT id, tenant_id, device_id, if_index, category, severity, message, metadata, triggered_at, resolved_at FROM alerts`
+	clauses := []string{"tenant_id=$1"}
+	args := []any{tenantID}
 
 	if filter.DeviceID != nil {
 		args = append(args, *filter.DeviceID)
@@ -77,7 +77,7 @@ func (s *Store) ListAlerts(ctx context.Context, orgID int64, filter AlertFilter)
 	var alerts []Alert
 	for rows.Next() {
 		var a Alert
-		if err := rows.Scan(&a.ID, &a.OrgID, &a.DeviceID, &a.IfIndex, &a.Category, &a.Severity, &a.Message, &a.Metadata, &a.TriggeredAt, &a.ResolvedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.TenantID, &a.DeviceID, &a.IfIndex, &a.Category, &a.Severity, &a.Message, &a.Metadata, &a.TriggeredAt, &a.ResolvedAt); err != nil {
 			return nil, err
 		}
 		alerts = append(alerts, a)

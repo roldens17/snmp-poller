@@ -58,4 +58,7 @@ export const api = {
     login: (email, password) => postJson(`/auth/login`, { email, password }),
     logout: () => postJson(`/auth/logout`, {}),
     me: () => fetchWithTimeout(`/auth/me`),
+    getTenants: () => fetchWithTimeout(`/tenants`),
+    getActiveTenant: () => fetchWithTimeout(`/tenants/active`),
+    setActiveTenant: (tenantId) => postJson(`/tenants/active`, { tenant_id: tenantId }),
 };

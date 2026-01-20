@@ -105,3 +105,33 @@ Without cookie => 401:
 ```sh
 curl -i http://localhost:8081/devices
 ```
+
+## Multi-Tenancy
+The system is now multi-tenant.
+- **Tenants**: Data is isolated by `tenant_id`. Authenticated users belong to one or more tenants.
+- **Default Tenant**: A "default" tenant is created automatically. All legacy data is migrated to it.
+- **API**: Endpoints filter data by the user's active tenant (currently the first assigned tenant).
+  - `GET /tenants`: List available tenants.
+  - `X-Org-ID`: Legacy header is ignored; tenant is resolved from session.
+- **Poller**: The poller writes to the "default" tenant by default.
+
+### Smoke Tests
+```bash
+# Register (if enabled) or Login
+# Make sure to use correct port (e.g., 8081 if mapped in docker-compose, or 8080 local)
+curl -c cookies.txt -d '{"email":"admin@example.com", "password":"changeme"}' http://localhost:8081/auth/login
+
+# List Tenants
+curl -b cookies.txt http://localhost:8081/tenants
+
+# Get Active Tenant
+curl -b cookies.txt http://localhost:8081/tenants/active
+
+# Switch Tenant (replace UUID)
+curl -b cookies.txt -X POST http://localhost:8081/tenants/active \
+  -H 'Content-Type: application/json' \
+  -d '{"tenant_id":"<target-uuid>"}'
+
+# List Devices (scoped to tenant)
+curl -b cookies.txt http://localhost:8081/devices
+```
