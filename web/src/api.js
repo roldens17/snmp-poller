@@ -60,5 +60,12 @@ export const api = {
     me: () => fetchWithTimeout(`/auth/me`),
     getTenants: () => fetchWithTimeout(`/tenants`),
     getActiveTenant: () => fetchWithTimeout(`/tenants/active`),
+    getActiveTenant: () => fetchWithTimeout(`/tenants/active`),
     setActiveTenant: (tenantId) => postJson(`/tenants/active`, { tenant_id: tenantId }),
+    seedDemo: () => postJson(`/demo/seed`, {}),
+    resetDemo: () => postJson(`/demo/reset`, {}),
+    getAlertDestinations: () => fetchWithTimeout(`/alert-destinations`),
+    createAlertDestination: (data) => postJson(`/alert-destinations`, data),
+    updateAlertDestination: (id, data) => fetchWithTimeout(`/alert-destinations/${id}`, { method: 'PATCH', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } }),
+    deleteAlertDestination: (id) => fetchWithTimeout(`/alert-destinations/${id}`, { method: 'DELETE' }),
 };

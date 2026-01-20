@@ -38,4 +38,5 @@ services:
       CONFIG_FILE: /config.yaml
       AUTH_ALLOW_REGISTER: "false"
       AUTH_JWT_SECRET: "dev-super-secret-change-me"
+      DEMO_MODE: "true"
 

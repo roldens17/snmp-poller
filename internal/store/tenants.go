@@ -65,3 +65,29 @@ func (s *Store) GetTenantBySlug(ctx context.Context, slug string) (*Tenant, erro
 	}
 	return &t, nil
 }
+
+// DeleteDemoData removes demo-generated data.
+func (s *Store) DeleteDemoData(ctx context.Context, tenantID string) error {
+	// Use explicit transactions if consistency needed, but simple execs are fine for demo reset.
+	var err error
+	_, err = s.pool.Exec(ctx, "DELETE FROM mac_entries WHERE tenant_id=$1 AND device_id IN (SELECT id FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%')", tenantID)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, "DELETE FROM alerts WHERE tenant_id=$1 AND device_id IN (SELECT id FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%')", tenantID)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, "DELETE FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%'", tenantID)
+	return err
+}
+
+// AddUserToTenant adds a user to a tenant.
+func (s *Store) AddUserToTenant(ctx context.Context, userID, tenantID, role string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO user_tenants (user_id, tenant_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, tenant_id) DO UPDATE SET role = EXCLUDED.role, created_at = now()
+	`, userID, tenantID, role)
+	return err
+}

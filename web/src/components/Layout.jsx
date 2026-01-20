@@ -175,14 +175,41 @@ export function Layout({ children, user, onLogout }) {
                         )}
 
                         <div className="h-4 w-[1px] bg-rich-dark hidden md:block"></div>
+
+                        {/* Demo Controls */}
+                        <div className="flex gap-2">
+                            <button onClick={async () => {
+                                if (confirm("Seed demo data?")) {
+                                    try {
+                                        const res = await api.seedDemo();
+                                        alert(`Seeded: ${JSON.stringify(res.stats)}`);
+                                        window.location.reload();
+                                    } catch (e) { alert("Failed to seed: " + e.message); }
+                                }
+                            }} className="px-3 py-1 bg-gold/10 hover:bg-gold/20 text-gold text-xs rounded border border-gold/20 transition">
+                                Seed Demo
+                            </button>
+                            <button onClick={async () => {
+                                if (confirm("Reset demo data?")) {
+                                    try {
+                                        await api.resetDemo();
+                                        alert("Demo data reset.");
+                                        window.location.reload();
+                                    } catch (e) { alert("Failed to reset: " + e.message); }
+                                }
+                            }} className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs rounded border border-red-500/20 transition">
+                                Reset
+                            </button>
+                        </div>
+                        <div className="h-4 w-[1px] bg-rich-dark hidden md:block"></div>
                         <button className="relative p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition group">
                             <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-rich-black animate-pulse"></span>
                             <Bell className="w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] transition" />
                         </button>
                         <div className="h-8 w-[1px] bg-rich-dark"></div>
-                        <button className="p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition">
+                        <Link to="/settings" className="p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition">
                             <Settings className="w-5 h-5 hover:rotate-90 transition-transform duration-500" />
-                        </button>
+                        </Link>
                     </div>
                 </header>
 

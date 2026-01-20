@@ -39,6 +39,9 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 
 // Config holds service configuration loaded from YAML and env.
 type Config struct {
+	// DemoMode enables demo endpoints.
+	DemoMode bool `yaml:"demo_mode"`
+
 	PollInterval Duration       `yaml:"poll_interval"`
 	WorkerCount  int            `yaml:"worker_count"`
 	Switches     []Switch       `yaml:"switches"`
@@ -349,5 +352,8 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := strings.TrimSpace(os.Getenv("AUTH_ALLOW_REGISTER")); v != "" {
 		c.Auth.AllowRegister = v == "1" || strings.EqualFold(v, "true")
+	}
+	if v := strings.TrimSpace(os.Getenv("DEMO_MODE")); v != "" {
+		c.DemoMode = v == "1" || strings.EqualFold(v, "true")
 	}
 }

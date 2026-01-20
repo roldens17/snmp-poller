@@ -7,6 +7,7 @@ import { DeviceDetail } from './pages/DeviceDetail';
 import { Topology } from './pages/Topology';
 import { Reports } from './pages/Reports';
 import { Alerts } from './pages/Alerts';
+import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Login } from './pages/Login';
@@ -23,7 +24,9 @@ function AppShell() {
         <Route path="/devices/:id" element={<DeviceDetail />} />
         <Route path="/topology" element={<Topology />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/alerts" element={<Alerts />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   );

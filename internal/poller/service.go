@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/fresatu/snmp-poller/internal/config"
+	"github.com/fresatu/snmp-poller/internal/notification"
 	"github.com/fresatu/snmp-poller/internal/snmpclient"
 	"github.com/fresatu/snmp-poller/internal/store"
 )
@@ -19,6 +20,7 @@ import (
 type Service struct {
 	cfg             *config.Config
 	store           *store.Store
+	notifier        *notification.Service
 	jobs            chan config.Switch
 	metrics         *pollerMetrics
 	defaultTenantID string
@@ -26,12 +28,16 @@ type Service struct {
 
 // NewService builds a poller Service.
 func NewService(cfg *config.Config, db *store.Store) *Service {
+	// Initialize Notification Service
+	notifier := notification.NewService(db)
+
 	m := newPollerMetrics(cfg.Metrics.Enabled)
 	return &Service{
-		cfg:     cfg,
-		store:   db,
-		jobs:    make(chan config.Switch, cfg.WorkerCount*2+1),
-		metrics: m,
+		cfg:      cfg,
+		store:    db,
+		notifier: notifier,
+		jobs:     make(chan config.Switch, cfg.WorkerCount*2+1),
+		metrics:  m,
 	}
 }
 

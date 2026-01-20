@@ -108,3 +108,15 @@ type DiscoveryRecord struct {
 	Reachable   bool      `json:"reachable"`
 	LastAttempt time.Time `json:"last_attempt"`
 }
+
+// AlertDestination defines where notifications are sent.
+type AlertDestination struct {
+	ID        string    `json:"id"`
+	TenantID  string    `json:"tenant_id"`
+	Type      string    `json:"type"` // e.g. "webhook"
+	Name      string    `json:"name"` // e.g. "Slack NOC"
+	URL       string    `json:"url"`  // Redacted in API responses
+	IsEnabled bool      `json:"is_enabled"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

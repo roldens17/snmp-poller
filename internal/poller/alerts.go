@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/fresatu/snmp-poller/internal/notification"
 	"github.com/fresatu/snmp-poller/internal/snmpclient"
 	"github.com/fresatu/snmp-poller/internal/store"
 )
@@ -69,14 +70,27 @@ func (s *Service) raiseAlert(ctx context.Context, tenantID string, deviceID int6
 		Message:  message,
 		Metadata: "{}",
 	}
-	if err := s.store.UpsertAlert(ctx, alert); err != nil {
+
+	savedAlert, created, err := s.store.UpsertAlert(ctx, alert)
+	if err != nil {
 		log.Warn().Err(err).Msg("raise alert failed")
+		return
+	}
+
+	if created {
+		s.notifier.Dispatch(ctx, tenantID, notification.EventAlertCreated, *savedAlert)
 	}
 }
 
 func (s *Service) clearAlert(ctx context.Context, tenantID string, deviceID int64, ifIndex int, category string) {
 	idx := ifIndex
-	if err := s.store.ResolveAlert(ctx, tenantID, deviceID, &idx, category); err != nil {
+	resolvedAlert, err := s.store.ResolveAlert(ctx, tenantID, deviceID, &idx, category)
+	if err != nil {
 		log.Warn().Err(err).Msg("resolve alert failed")
+		return
+	}
+
+	if resolvedAlert != nil {
+		s.notifier.Dispatch(ctx, tenantID, notification.EventAlertResolved, *resolvedAlert)
 	}
 }

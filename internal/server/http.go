@@ -118,11 +118,24 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/tenants", s.handleListTenants)
 	protected.GET("/tenants/active", s.handleGetActiveTenant)
 	protected.POST("/tenants/active", s.handleSwitchTenant)
+
+	log.Info().Bool("demo_mode", s.cfg.DemoMode).Msg("server config")
+
+	if s.cfg.DemoMode {
+		protected.POST("/demo/seed", s.handleDemoSeed)
+		protected.POST("/demo/reset", s.handleDemoReset)
+	}
+
 	protected.GET("/devices", s.handleListDevices)
 	protected.GET("/devices/:id", s.handleGetDevice)
 	protected.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)
 	protected.GET("/devices/:id/macs", s.handleDeviceMacs)
 	protected.GET("/macs", s.handleListMacs)
+	protected.GET("/alert-destinations", s.handleListAlertDestinations)
+	protected.POST("/alert-destinations", s.handleCreateAlertDestination)
+	protected.PATCH("/alert-destinations/:id", s.handleUpdateAlertDestination)
+	protected.DELETE("/alert-destinations/:id", s.handleDeleteAlertDestination)
+
 	protected.GET("/alerts", s.handleListAlerts)
 	if s.cfg.Metrics.Enabled {
 		protected.GET("/metrics", gin.WrapH(promhttp.Handler()))
