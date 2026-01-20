@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
+	"github.com/fresatu/snmp-poller/internal/auth"
 	"github.com/fresatu/snmp-poller/internal/config"
 	"github.com/fresatu/snmp-poller/internal/store"
 )
@@ -23,11 +24,12 @@ const defaultOrgID = 1
 type HTTPServer struct {
 	cfg   *config.Config
 	store *store.Store
+	auth  *auth.Service
 }
 
 // NewHTTPServer configures the API server.
 func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
-	return &HTTPServer{cfg: cfg, store: db}
+	return &HTTPServer{cfg: cfg, store: db, auth: auth.NewService(cfg.Auth)}
 }
 
 // Run starts the HTTP listener until ctx cancellation.
@@ -53,17 +55,21 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	})
 	// Allow browser clients on the Vite dev host to call the API.
 	engine.Use(func(c *gin.Context) {
-		allowedOrigins := map[string]bool{
-			"http://192.168.100.84:3000": true,
-			"http://localhost:3000":      true, // optional localhost
-		}
 		origin := c.GetHeader("Origin")
-		if allowedOrigins[origin] {
+		allowed := false
+		for _, candidate := range s.cfg.HTTP.AllowedOrigins {
+			if origin == candidate {
+				allowed = true
+				break
+			}
+		}
+		if allowed {
 			h := c.Writer.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
-			h.Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			h.Set("Access-Control-Allow-Credentials", "true")
 			if c.Request.Method == http.MethodOptions {
 				c.AbortWithStatus(http.StatusNoContent)
 				return
@@ -74,22 +80,22 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 		}
 		c.Next()
 	})
-engine.GET("/", func(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"name":    "snmp-poller",
-		"status":  "ok",
-		"version": "dev",
-		"routes": []string{
-			"/health",
-			"/healthz",
-			"/devices",
-			"/alerts",
-			"/macs",
-			"/metrics",
-		},
-	})
-})
 
+	engine.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"name":    "snmp-poller",
+			"status":  "ok",
+			"version": "dev",
+			"routes": []string{
+				"/health",
+				"/healthz",
+				"/devices",
+				"/alerts",
+				"/macs",
+				"/metrics",
+			},
+		})
+	})
 
 	health := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC()})
@@ -104,16 +110,24 @@ engine.GET("/", func(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	engine.GET("/devices", s.handleListDevices)
-	engine.GET("/devices/:id", s.handleGetDevice)
-	engine.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)
-	engine.GET("/devices/:id/macs", s.handleDeviceMacs)
-	engine.GET("/macs", s.handleListMacs)
-	engine.GET("/alerts", s.handleListAlerts)
-	engine.GET("/discovery", s.handleDiscovery)
+	engine.POST("/auth/login", s.handleAuthLogin)
+	engine.POST("/auth/logout", s.handleAuthLogout)
+	engine.GET("/auth/me", s.authRequired(), s.handleAuthMe)
+	engine.POST("/auth/register", s.handleAuthRegister)
+
+	protected := engine.Group("/")
+	protected.Use(s.authRequired())
+	protected.GET("/devices", s.handleListDevices)
+	protected.GET("/devices/:id", s.handleGetDevice)
+	protected.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)
+	protected.GET("/devices/:id/macs", s.handleDeviceMacs)
+	protected.GET("/macs", s.handleListMacs)
+	protected.GET("/alerts", s.handleListAlerts)
 	if s.cfg.Metrics.Enabled {
-		engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		protected.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	}
+
+	engine.GET("/discovery", s.handleDiscovery)
 
 	srv := &http.Server{
 		Addr:    s.cfg.HTTP.Addr,

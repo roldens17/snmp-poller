@@ -7,22 +7,45 @@ import { DeviceDetail } from './pages/DeviceDetail';
 import { Topology } from './pages/Topology';
 import { Reports } from './pages/Reports';
 import { Alerts } from './pages/Alerts';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { RequireAuth } from './auth/RequireAuth';
+import { Login } from './pages/Login';
+
+function AppShell() {
+  const { user, logout } = useAuth();
+
+  return (
+    <Layout user={user} onLogout={logout}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/devices" element={<Devices />} />
+        <Route path="/switches" element={<Switches />} />
+        <Route path="/devices/:id" element={<DeviceDetail />} />
+        <Route path="/topology" element={<Topology />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/reports" element={<Reports />} />
+      </Routes>
+    </Layout>
+  );
+}
 
 function App() {
   return (
-    <BrowserRouter>
-      <Layout>
+    <AuthProvider>
+      <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/devices" element={<Devices />} />
-          <Route path="/switches" element={<Switches />} />
-          <Route path="/devices/:id" element={<DeviceDetail />} />
-          <Route path="/topology" element={<Topology />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/reports" element={<Reports />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
+            }
+          />
         </Routes>
-      </Layout>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

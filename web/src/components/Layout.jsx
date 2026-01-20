@@ -3,7 +3,7 @@ import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, 
 import { useState } from 'react';
 import clsx from 'clsx';
 
-export function Layout({ children }) {
+export function Layout({ children, user, onLogout }) {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -83,16 +83,24 @@ export function Layout({ children }) {
                 </nav>
 
                 <div className="p-4 border-t border-rich-dark bg-rich-black/30">
-                    <div className="flex items-center p-3 rounded-xl bg-white/5 border border-white/5 hover:border-gold/20 transition cursor-pointer group">
+                    <div className="flex items-center p-3 rounded-xl bg-white/5 border border-white/5 hover:border-gold/20 transition">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold to-yellow-600 p-[1px]">
                             <div className="w-full h-full rounded-full bg-rich-gray flex items-center justify-center">
-                                <span className="font-bold text-xs text-gold">AD</span>
+                                <span className="font-bold text-xs text-gold">{user?.email?.[0]?.toUpperCase() ?? 'U'}</span>
                             </div>
                         </div>
-                        <div className="ml-3">
-                            <div className="text-sm font-medium text-gray-200 group-hover:text-gold transition">Admin User</div>
-                            <div className="text-xs text-gray-500">NetOps Team</div>
+                        <div className="ml-3 flex-1">
+                            <div className="text-sm font-medium text-gray-200">{user?.name || user?.email || 'User'}</div>
+                            <div className="text-xs text-gray-500">{user?.role || 'member'}</div>
                         </div>
+                        {onLogout && (
+                            <button
+                                onClick={onLogout}
+                                className="text-xs uppercase tracking-widest text-gold/70 hover:text-gold transition"
+                            >
+                                Logout
+                            </button>
+                        )}
                     </div>
                 </div>
             </aside>

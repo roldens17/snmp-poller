@@ -19,3 +19,7 @@ dist/
 .vscode/
 .aider*
 ops/ai/.env
+
+# Local only
+config.yaml
+cookies.txt

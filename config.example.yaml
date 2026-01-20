@@ -2,6 +2,14 @@ poll_interval: 1m
 worker_count: 6
 http:
   addr: ":8080"
+  allowed_origins:
+    - "http://localhost:3000"
+auth:
+  jwt_secret: "replace-me"
+  cookie_name: "snmpai_session"
+  cookie_secure: false
+  token_ttl: 24h
+  allow_register: false
 postgres:
   dsn: postgres://snmp:snmp@postgres:5432/snmp?sslmode=disable
   max_conns: 16

@@ -44,6 +44,7 @@ type Config struct {
 	Switches     []Switch       `yaml:"switches"`
 	Postgres     PostgresConfig `yaml:"postgres"`
 	HTTP         HTTPConfig     `yaml:"http"`
+	Auth         AuthConfig     `yaml:"auth"`
 	SNMP         SNMPDefaults   `yaml:"snmp_defaults"`
 	Discovery    Discovery      `yaml:"discovery"`
 	Alerting     Alerting       `yaml:"alerts"`
@@ -80,11 +81,29 @@ type PostgresConfig struct {
 
 // HTTPConfig configures the REST server.
 type HTTPConfig struct {
-	Addr        string `yaml:"addr"`
-	EnableTLS   bool   `yaml:"enable_tls"`
-	CertFile    string `yaml:"cert_file"`
-	KeyFile     string `yaml:"key_file"`
-	EnableDebug bool   `yaml:"debug"`
+	Addr           string   `yaml:"addr"`
+	EnableTLS      bool     `yaml:"enable_tls"`
+	CertFile       string   `yaml:"cert_file"`
+	KeyFile        string   `yaml:"key_file"`
+	EnableDebug    bool     `yaml:"debug"`
+	AllowedOrigins []string `yaml:"allowed_origins"`
+}
+
+// AuthConfig defines authentication settings.
+type AuthConfig struct {
+	JWTSecret     string   `yaml:"jwt_secret"`
+	CookieName    string   `yaml:"cookie_name"`
+	CookieSecure  *bool    `yaml:"cookie_secure"`
+	TokenTTL      Duration `yaml:"token_ttl"`
+	AllowRegister bool     `yaml:"allow_register"`
+}
+
+// CookieSecureValue returns the secure cookie setting, defaulting to false.
+func (a AuthConfig) CookieSecureValue() bool {
+	if a.CookieSecure == nil {
+		return false
+	}
+	return *a.CookieSecure
 }
 
 // SNMPDefaults captures default switch polling parameters.
@@ -162,6 +181,9 @@ func (c *Config) Validate() error {
 	if c.Postgres.DSN == "" {
 		return errors.New("postgres.dsn is required (set POSTGRES_DSN or configure postgres.dsn)")
 	}
+	if c.Auth.JWTSecret == "" {
+		return errors.New("auth.jwt_secret is required (set AUTH_JWT_SECRET or configure auth.jwt_secret)")
+	}
 
 	return nil
 }
@@ -176,8 +198,21 @@ func (c *Config) applyDefaults() {
 	if c.HTTP.Addr == "" {
 		c.HTTP.Addr = ":8080"
 	}
+	if len(c.HTTP.AllowedOrigins) == 0 {
+		c.HTTP.AllowedOrigins = []string{"http://localhost:3000"}
+	}
 	if c.Postgres.MaxConns == 0 {
 		c.Postgres.MaxConns = 8
+	}
+	if c.Auth.CookieName == "" {
+		c.Auth.CookieName = "snmpai_session"
+	}
+	if c.Auth.TokenTTL.Duration == 0 {
+		c.Auth.TokenTTL.Duration = 24 * time.Hour
+	}
+	if c.Auth.CookieSecure == nil {
+		secure := strings.EqualFold(os.Getenv("ENV"), "production")
+		c.Auth.CookieSecure = &secure
 	}
 
 	if c.SNMP.Port == 0 {
@@ -255,6 +290,16 @@ func (c *Config) applyEnvOverrides() {
 	if v := os.Getenv("HTTP_ADDR"); v != "" {
 		c.HTTP.Addr = v
 	}
+	if v := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); v != "" {
+		origins := strings.Split(v, ",")
+		c.HTTP.AllowedOrigins = make([]string, 0, len(origins))
+		for _, origin := range origins {
+			trimmed := strings.TrimSpace(origin)
+			if trimmed != "" {
+				c.HTTP.AllowedOrigins = append(c.HTTP.AllowedOrigins, trimmed)
+			}
+		}
+	}
 	if v := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); v != "" {
 		c.Postgres.DSN = v
 	}
@@ -286,5 +331,23 @@ func (c *Config) applyEnvOverrides() {
 		if dur, err := time.ParseDuration(v); err == nil {
 			c.Discovery.Interval.Duration = dur
 		}
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")); v != "" {
+		c.Auth.JWTSecret = v
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_COOKIE_NAME")); v != "" {
+		c.Auth.CookieName = v
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_COOKIE_SECURE")); v != "" {
+		secure := v == "1" || strings.EqualFold(v, "true")
+		c.Auth.CookieSecure = &secure
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_TOKEN_TTL_HOURS")); v != "" {
+		if hours, err := strconv.Atoi(v); err == nil && hours > 0 {
+			c.Auth.TokenTTL.Duration = time.Duration(hours) * time.Hour
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_ALLOW_REGISTER")); v != "" {
+		c.Auth.AllowRegister = v == "1" || strings.EqualFold(v, "true")
 	}
 }

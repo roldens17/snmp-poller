@@ -12,6 +12,7 @@ async function fetchWithTimeout(path, options = {}) {
     try {
         const response = await fetch(`${API_BASE}${path}`, {
             ...options,
+            credentials: 'include',
             signal: controller.signal
         });
 
@@ -37,6 +38,14 @@ async function fetchWithTimeout(path, options = {}) {
     }
 }
 
+function postJson(path, body) {
+    return fetchWithTimeout(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
+
 export const api = {
     getDevices: (query = '') => fetchWithTimeout(`/devices${query}`, { retryOn: [502, 503, 504] }),
     getDevice: (id) => fetchWithTimeout(`/devices/${id}`),
@@ -46,4 +55,7 @@ export const api = {
     getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`),
     getDiscovery: () => fetchWithTimeout(`/discovery`),
     getHealth: () => fetchWithTimeout(`/healthz`),
+    login: (email, password) => postJson(`/auth/login`, { email, password }),
+    logout: () => postJson(`/auth/logout`, {}),
+    me: () => fetchWithTimeout(`/auth/me`),
 };

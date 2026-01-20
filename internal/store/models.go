@@ -10,6 +10,17 @@ type Organization struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// User represents an authenticated user account.
+type User struct {
+	ID           string    `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`
+	Name         string    `json:"name"`
+	Role         string    `json:"role"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 // Device represents a managed switch.
 type Device struct {
 	ID          int64     `json:"id"`

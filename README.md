@@ -9,6 +9,7 @@ Production-ready Go service that polls network switches via SNMP v2c, stores sta
 - Alert engine detects interface down events, error-rate spikes, and bandwidth threshold breaches with configurable thresholds.
 - Optional discovery loop sweeps configured subnets and records reachable SNMP hosts.
 - REST API (Gin) exposes devices, interfaces, MAC table, alerts, and discovery logs plus `/healthz` + `/metrics` (if enabled).
+- Authenticated API with JWT (HTTP-only cookie) for devices, alerts, MACs, and metrics endpoints.
 - Structured logging (zerolog) and Prometheus metrics (poll duration/error counters).
 
 ## Run locally
@@ -50,9 +51,12 @@ go run ./cmd/snmp-poller -config config.yaml
   - `alerts`: thresholds (`interface_down_after`, `error_rate_threshold`, `bandwidth_threshold`)
   - `metrics`: toggle + `addr`
 - Env overrides (examples): `POSTGRES_DSN`, `HTTP_ADDR`, `POLL_INTERVAL`, `WORKER_COUNT`, `METRICS_ENABLED`, `DISCOVERY_ENABLED`, `ALERT_ERROR_RATE`, `ALERT_BANDWIDTH`.
+- CORS env override: `CORS_ALLOWED_ORIGINS` (comma-separated).
+- Auth env vars: `AUTH_JWT_SECRET` (required), `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`, `AUTH_TOKEN_TTL_HOURS`, `AUTH_ALLOW_REGISTER`.
 
 ## API Highlights
 - `GET /healthz`
+- `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` (optional `POST /auth/register` when enabled)
 - `GET /devices`, `GET /devices/:id`
 - `GET /devices/:id/interfaces`
 - `GET /devices/:id/macs`, `GET /macs?mac=<prefix>&device_id=&vlan=`
@@ -73,3 +77,31 @@ See `migrations/001_init.up.sql` for details:
 - Requires Go 1.21+ for local builds. This environment currently lacks the Go toolchain, so `go build`/`gofmt` could not be executed here.
 - Migrations are embedded and run automatically on startup.
 - The worker pool, discovery loop, and metrics can be tuned via config/env variables.
+
+## Auth Smoke Tests
+
+Login should set cookie:
+```sh
+curl -i -X POST http://localhost:8081/auth/login \\
+  -H 'Content-Type: application/json' \\
+  -d '{\"email\":\"admin@example.com\",\"password\":\"changeme\"}'
+```
+
+Access protected route with cookie jar:
+```sh
+curl -c cookies.txt -i -X POST http://localhost:8081/auth/login \\
+  -H 'Content-Type: application/json' \\
+  -d '{\"email\":\"admin@example.com\",\"password\":\"changeme\"}'
+
+curl -b cookies.txt -i http://localhost:8081/devices
+```
+
+`/auth/me` works:
+```sh
+curl -b cookies.txt -i http://localhost:8081/auth/me
+```
+
+Without cookie => 401:
+```sh
+curl -i http://localhost:8081/devices
+```
