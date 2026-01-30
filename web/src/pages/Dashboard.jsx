@@ -5,6 +5,7 @@ import { AlertCircle, Server, ToggleRight, GitMerge, Bug, Octagon, ArrowRight, B
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { getDeviceStatusInfo } from '../utils/deviceStatus';
+import { motion } from 'framer-motion';
 
 export function Dashboard() {
     const [stats, setStats] = useState({ devices: 0, alerts: 0, up: 0, down: 0 });
@@ -53,9 +54,9 @@ export function Dashboard() {
     }, []);
 
     const cardData = [
-        { title: 'Total Devices', value: stats.devices, icon: Server, color: 'text-gold', secondary: `${stats.devices} Monitored`, path: '/devices' },
+        { title: 'Total Clients', value: stats.devices, icon: Server, color: 'text-gold', secondary: `${stats.devices} Monitored`, path: '/clients' },
         { title: 'Switches Online', value: `${stats.up}/${stats.devices}`, icon: ToggleRight, color: stats.down > 0 ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]', secondary: `${stats.down} Offline`, path: '/switches' },
-        { title: 'Rogue Devices', value: 0, icon: AlertCircle, color: 'text-gray-400', secondary: 'No threats', path: '/devices' },
+        { title: 'Rogue Devices', value: 0, icon: AlertCircle, color: 'text-gray-400', secondary: 'No threats', path: '/clients' },
         { title: 'Loops Detected', value: 0, icon: GitMerge, color: 'text-gray-400', secondary: 'Stable', path: '/topology' },
         { title: 'Active Alerts', value: stats.alerts, icon: Bug, color: stats.alerts > 0 ? 'text-red-500' : 'text-gold', secondary: 'Current', path: '/alerts' },
     ];
@@ -87,38 +88,64 @@ export function Dashboard() {
         );
     }
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0 }
+    };
+
     return (
-        <div className="fade-in space-y-8">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8"
+        >
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {cardData.map((card, i) => (
-                    <Link
-                        key={i}
-                        to={card.path}
-                        className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-gold/30 transition duration-500 focus:outline-none focus:ring-2 focus:ring-gold/50 cursor-pointer"
-                    >
-                        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-gold/10 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition duration-700 blur-xl"></div>
+                    <motion.div variants={itemVariants} key={i}>
+                        <Link
+                            to={card.path}
+                            className="block h-full"
+                        >
+                            <motion.div
+                                whileHover={{ y: -5, boxShadow: "0 10px 30px -10px rgba(212, 175, 55, 0.15)" }}
+                                className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-gold/30 transition duration-500 h-full"
+                            >
+                                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-gold/10 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition duration-700 blur-xl"></div>
 
-                        <div className="flex justify-between items-start relative z-10">
-                            <div className={clsx("p-2 rounded-lg bg-white/5 ring-1 ring-white/10 group-hover:ring-gold/20 transition duration-500", card.color.includes('text-gold') && "shadow-[0_0_15px_rgba(212,175,55,0.1)]")}>
-                                <card.icon className={clsx("w-6 h-6", card.color)} />
-                            </div>
-                            <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-full bg-white/5 text-gray-400 border border-white/5 uppercase">Metric</span>
-                        </div>
+                                <div className="flex justify-between items-start relative z-10">
+                                    <div className={clsx("p-2 rounded-lg bg-white/5 ring-1 ring-white/10 group-hover:ring-gold/20 transition duration-500", card.color.includes('text-gold') && "shadow-[0_0_15px_rgba(212,175,55,0.1)]")}>
+                                        <card.icon className={clsx("w-6 h-6", card.color)} />
+                                    </div>
+                                    <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-full bg-white/5 text-gray-400 border border-white/5 uppercase">Metric</span>
+                                </div>
 
-                        <div className="mt-6 relative z-10">
-                            <p className="text-4xl font-extrabold text-white tracking-tight group-hover:text-gold-light transition duration-300">{card.value}</p>
-                            <p className="text-sm text-gray-400 mt-1 font-medium">{card.title}</p>
-                            <div className="h-px w-8 bg-gold/20 my-3 group-hover:w-full transition-all duration-700"></div>
-                            <p className="text-xs text-gold/80 font-mono tracking-wide">{card.secondary}</p>
-                        </div>
-                    </Link>
+                                <div className="mt-6 relative z-10">
+                                    <p className="text-4xl font-extrabold text-white tracking-tight group-hover:text-gold-light transition duration-300">{card.value}</p>
+                                    <p className="text-sm text-gray-400 mt-1 font-medium">{card.title}</p>
+                                    <div className="h-px w-8 bg-gold/20 my-3 group-hover:w-full transition-all duration-700"></div>
+                                    <p className="text-xs text-gold/80 font-mono tracking-wide">{card.secondary}</p>
+                                </div>
+                            </motion.div>
+                        </Link>
+                    </motion.div>
                 ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Top Talkers */}
-                <div className="lg:col-span-2 glass-panel p-8 rounded-2xl">
+                <motion.div variants={itemVariants} className="lg:col-span-2 glass-panel p-8 rounded-2xl">
                     <h2 className="text-xl font-bold mb-8 flex items-center text-white">
                         <div className="p-2 rounded-lg bg-gold/10 mr-3 border border-gold/10">
                             <BarChart2 className="w-5 h-5 text-gold" />
@@ -143,8 +170,11 @@ export function Dashboard() {
                     </h2>
                     <div className="space-y-6 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                         {topTalkers.map((t, i) => (
-                            <div
+                            <motion.div
                                 key={i}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: i * 0.1 }}
                                 className="group cursor-pointer rounded-lg transition hover:bg-white/5 p-2 focus-within:ring-2 focus-within:ring-gold/50"
                                 onClick={() => handleTopTalkerClick(t)}
                                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleTopTalkerClick(t)}
@@ -160,26 +190,28 @@ export function Dashboard() {
                                     <span className="font-mono text-gold-light drop-shadow-[0_0_5px_rgba(212,175,55,0.3)]">{getTrafficValue(t).toLocaleString()} MB</span>
                                 </div>
                                 <div className="w-full bg-rich-dark rounded-full h-2.5 overflow-hidden">
-                                    <div
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${Math.min(100, (getTrafficValue(t) / 2000) * 100)}%` }}
+                                        transition={{ duration: 1, ease: "easeOut" }}
                                         className="h-full rounded-full bg-gradient-to-r from-gold-dark via-gold to-gold-light relative"
-                                        style={{ width: `${Math.min(100, (getTrafficValue(t) / 2000) * 100)}%` }}
                                     >
                                         <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
-                                    </div>
+                                    </motion.div>
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
                         {topTalkers.length === 0 && (
                             <div className="text-center text-gray-500 py-10 italic flex flex-col items-center space-y-3">
                                 <div>No traffic data available</div>
-                                <Link to="/devices" className="text-xs text-gold hover:text-white transition border border-gold/30 px-3 py-1 rounded-full">Add devices to start</Link>
+                                <Link to="/switches" className="text-xs text-gold hover:text-white transition border border-gold/30 px-3 py-1 rounded-full hover:shadow-[0_0_15px_rgba(212,175,55,0.2)]">Register Switches to see traffic</Link>
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Alerts */}
-                <div className="lg:col-span-1 glass-panel p-0 rounded-2xl overflow-hidden flex flex-col">
+                <motion.div variants={itemVariants} className="lg:col-span-1 glass-panel p-0 rounded-2xl overflow-hidden flex flex-col">
                     <div className="p-6 border-b border-white/5 bg-white/[0.02]">
                         <h2 className="text-lg font-bold flex justify-between items-center text-white">
                             <span>Recent Alerts</span>
@@ -194,9 +226,13 @@ export function Dashboard() {
                     <ul className="divide-y divide-white/5 overflow-y-auto custom-scrollbar max-h-96">
                         {alerts.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                                <Octagon className="w-10 h-10 mb-3 opacity-20" />
-                                <span className="text-sm">No active alerts</span>
-                                <Link to="/alerts" className="text-xs text-gold hover:text-white transition mt-3 border border-white/5 hover:border-gold/30 rounded-full px-3 py-1">View alert history</Link>
+                                <div className="p-4 rounded-full bg-gold/5 mb-4 border border-gold/10 shadow-[0_0_15px_rgba(212,175,55,0.05)]">
+                                    <Bug className="w-8 h-8 text-gold/40" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-400">All systems operational</span>
+                                <Link to="/alerts" className="text-[10px] uppercase tracking-widest text-gold hover:text-white transition mt-4 border border-gold/20 hover:bg-gold/10 rounded-full px-4 py-1.5">
+                                    View History
+                                </Link>
                             </div>
                         ) : (
                             alerts.map(alert => (
@@ -239,8 +275,8 @@ export function Dashboard() {
                             </Link>
                         </div>
                     )}
-                </div>
+                </motion.div>
             </div>
-        </div>
+        </motion.div>
     );
 }

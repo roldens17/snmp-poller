@@ -100,6 +100,13 @@ type MACEntry struct {
 	IfIndex   *int      `json:"if_index"`
 	FirstSeen time.Time `json:"first_seen"`
 	LastSeen  time.Time `json:"last_seen"`
+
+	// Joined fields for display
+	DeviceHostname string `json:"device_hostname,omitempty"`
+	DeviceMgmtIP   string `json:"device_mgmt_ip,omitempty"`
+	PortName       string `json:"port_name,omitempty"`
+	PortDescr      string `json:"port_descr,omitempty"`
+	PortOperStatus string `json:"port_oper_status,omitempty"`
 }
 
 // Alert records alerting events.

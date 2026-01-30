@@ -78,6 +78,14 @@ func (s *Store) DeleteDemoData(ctx context.Context, tenantID string) error {
 	if err != nil {
 		return err
 	}
+	_, err = s.pool.Exec(ctx, "DELETE FROM interface_counters WHERE device_id IN (SELECT id FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%')", tenantID)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, "DELETE FROM interfaces WHERE device_id IN (SELECT id FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%')", tenantID)
+	if err != nil {
+		return err
+	}
 	_, err = s.pool.Exec(ctx, "DELETE FROM devices WHERE tenant_id=$1 AND hostname LIKE 'demo-%'", tenantID)
 	return err
 }

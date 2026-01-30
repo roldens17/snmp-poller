@@ -15,16 +15,16 @@ import (
 
 // InterfaceMetric carries SNMP sampled data.
 type InterfaceMetric struct {
-	Index      int
-	Name       string
-	Descr      string
-	Admin      string
-	Oper       string
-	Speed      uint64
-	InOctets   uint64
-	OutOctets  uint64
-	InErrors   uint64
-	OutErrors  uint64
+	Index     int
+	Name      string
+	Descr     string
+	Admin     string
+	Oper      string
+	Speed     uint64
+	InOctets  uint64
+	OutOctets uint64
+	InErrors  uint64
+	OutErrors uint64
 }
 
 // MACRecord describes a single MAC forwarding entry.
@@ -41,9 +41,9 @@ type ProbeResult struct {
 }
 
 var (
-	ifDescrOID      = "1.3.6.1.2.1.2.2.1.2"
-	ifNameOID       = "1.3.6.1.2.1.31.1.1.1.1"
-	ifAliasOID      = "1.3.6.1.2.1.31.1.1.1.18"
+	ifDescrOID       = "1.3.6.1.2.1.2.2.1.2"
+	ifNameOID        = "1.3.6.1.2.1.31.1.1.1.1"
+	ifAliasOID       = "1.3.6.1.2.1.31.1.1.1.18"
 	ifAdminStatusOID = "1.3.6.1.2.1.2.2.1.7"
 	ifOperStatusOID  = "1.3.6.1.2.1.2.2.1.8"
 	ifSpeedOID       = "1.3.6.1.2.1.2.2.1.5"
@@ -172,6 +172,7 @@ func PollMACTable(ctx context.Context, target config.Switch) ([]MACRecord, error
 	if err != nil {
 		return nil, err
 	}
+
 	if len(entries) == 0 {
 		return walkMacTable(ctx, session, dot1dTpFdbPortOID, baseMap, false)
 	}
@@ -224,12 +225,12 @@ func newSession(target config.Switch) (*gosnmp.GoSNMP, error) {
 	}
 
 	return &gosnmp.GoSNMP{
-		Target:    target.Address,
-		Port:      target.Port,
-		Community: target.Community,
-		Version:   version,
-		Timeout:   timeout,
-		Retries:   retries,
+		Target:         target.Address,
+		Port:           target.Port,
+		Community:      target.Community,
+		Version:        version,
+		Timeout:        timeout,
+		Retries:        retries,
 		MaxRepetitions: 25,
 	}, nil
 }

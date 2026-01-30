@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
-import { Devices } from './pages/Devices';
+import { Clients } from './pages/Clients';
 import { Switches } from './pages/Switches';
 import { DeviceDetail } from './pages/DeviceDetail';
 import { DeviceNew } from './pages/DeviceNew';
@@ -13,19 +13,20 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Login } from './pages/Login';
 
+
 function AppShell() {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   return (
     <Layout user={user} onLogout={logout}>
-      <Routes>
+      <Routes location={location}>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/devices" element={<Devices />} />
+        <Route path="/clients" element={<Clients />} />
         <Route path="/devices/new" element={<DeviceNew />} />
         <Route path="/switches" element={<Switches />} />
         <Route path="/devices/:id" element={<DeviceDetail />} />
         <Route path="/topology" element={<Topology />} />
-        <Route path="/alerts" element={<Alerts />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />

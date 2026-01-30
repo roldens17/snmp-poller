@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Search, Filter, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Database, Server, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { StatusMessage } from '../components/StatusMessage';
@@ -43,80 +43,119 @@ export function Switches() {
     const noMatches = !loading && !error && devices.length > 0 && filtered.length === 0;
 
     return (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 fade-in h-full flex flex-col">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-100">Switch Inventory <span className="text-gray-500 text-base font-normal">({devices.length})</span></h2>
-                <div className="flex mt-4 md:mt-0 space-x-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:flex-initial">
-                        <Search className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
+        <div className="flex flex-col h-full space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-2">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-gold/20 to-transparent border border-gold/10">
+                            <Server className="w-6 h-6 text-gold" />
+                        </div>
+                        <span className="text-glow">Switch Inventory</span>
+                    </h1>
+                    <p className="text-gray-400 mt-2 ml-1">Manage and monitor network infrastructure.</p>
+                </div>
+
+                <div className="flex space-x-3 w-full md:w-auto mt-4 md:mt-0">
+                    <Link
+                        to="/devices/new"
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-gold text-sm font-bold border border-gold/20 transition hover:shadow-gold/20 hover:shadow-lg"
+                        style={{ color: '#D4AF37', borderColor: 'rgba(212, 175, 55, 0.2)' }}
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Switch
+                    </Link>
+                    <div className="relative flex-1 md:flex-initial group">
+                        <Search className="w-4 h-4 absolute left-3 top-3 text-gray-500 group-focus-within:text-gold transition" />
                         <input
                             type="text"
                             placeholder="Search Host, IP..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full md:w-64 pl-10 p-2 rounded-lg bg-gray-700 border border-gray-600 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 text-sm outline-none text-white placeholder-gray-500"
+                            className="w-full md:w-72 pl-10 p-2.5 rounded-xl bg-rich-gray/50 border border-white/5 focus:ring-2 focus:ring-gold/50 focus:border-gold/50 text-sm outline-none text-white placeholder-gray-500 transition-all shadow-inner"
                         />
                     </div>
-                    <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg border border-gray-600 transition">
-                        <Filter className="w-5 h-5" />
-                    </button>
                 </div>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar flex-1">
-                <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-800 sticky top-0">
-                        <tr className="text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            <th className="p-4">Switch Name</th>
-                            <th className="p-4">IP Address</th>
-                            <th className="p-4">Site</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4">Last Seen</th>
-                            <th className="p-4">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {loading ? (
-                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="loading" title="Loading switches..." /></td></tr>
-                        ) : error ? (
-                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="error" title={error} onRetry={loadDevices} /></td></tr>
-                        ) : noDevices ? (
-                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No switches discovered yet." description="They’ll appear here once polling finds devices." /></td></tr>
-                        ) : noMatches ? (
-                            <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No switches match your search." /></td></tr>
-                        ) : (
-                            filtered.map(device => {
-                                const lastSeen = formatLastSeen(device.last_seen);
-                                const statusInfo = getDeviceStatusInfo(device.status, device.last_seen);
+            <div className="glass-panel-premium rounded-2xl overflow-hidden flex-1 flex flex-col shadow-2xl">
+                <div className="overflow-x-auto custom-scrollbar flex-1">
+                    <table className="min-w-full border-separate border-spacing-0">
+                        <thead className="bg-black/20 sticky top-0 backdrop-blur-md z-10">
+                            <tr className="text-left text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-white/5">
+                                <th className="p-5 pl-8 border-b border-white/5 bg-black/20 backdrop-blur-md">Switch Name</th>
+                                <th className="p-5 border-b border-white/5 bg-black/20 backdrop-blur-md">IP Address</th>
+                                <th className="p-5 border-b border-white/5 bg-black/20 backdrop-blur-md">Site</th>
+                                <th className="p-5 border-b border-white/5 bg-black/20 backdrop-blur-md">Status</th>
+                                <th className="p-5 border-b border-white/5 bg-black/20 backdrop-blur-md">Last Seen</th>
+                                <th className="p-5 pr-8 text-right border-b border-white/5 bg-black/20 backdrop-blur-md">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 bg-transparent">
+                            {loading ? (
+                                <tr><td colSpan="6" className="p-0"><div className="p-12"><StatusMessage variant="loading" title="Loading switches..." /></div></td></tr>
+                            ) : error ? (
+                                <tr><td colSpan="6" className="p-12"><StatusMessage variant="error" title={error} onRetry={loadDevices} /></td></tr>
+                            ) : noDevices ? (
+                                <tr><td colSpan="6" className="p-12"><StatusMessage variant="empty" title="No switches discovered yet." description="They’ll appear here once polling finds devices." /></td></tr>
+                            ) : noMatches ? (
+                                <tr><td colSpan="6" className="p-12"><StatusMessage variant="empty" title="No switches match your search." /></td></tr>
+                            ) : (
+                                filtered.map(device => {
+                                    const lastSeen = formatLastSeen(device.last_seen);
+                                    const statusInfo = getDeviceStatusInfo(device.status, device.last_seen);
 
-                                return (
-                                    <tr key={device.id} className="border-b border-gray-700 hover:bg-gray-700/50 transition duration-150 cursor-pointer group">
-                                        <td className="p-4 whitespace-nowrap text-sm font-bold text-amber-500 group-hover:text-amber-300 transition">{device.hostname}</td>
-                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300 font-mono">{formatHost(device.mgmt_ip) || '-'}</td>
-                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300">{device.site || '-'}</td>
-                                        <td className="p-4 whitespace-nowrap">
-                                            <span className={clsx(
-                                                "px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full border",
-                                                statusInfo.className
-                                            )}>
-                                                {statusInfo.label}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 whitespace-nowrap text-xs text-gray-400 font-mono">
-                                            {lastSeen instanceof Date ? formatDistanceToNow(lastSeen, { addSuffix: true }) : lastSeen}
-                                        </td>
-                                        <td className="p-4 whitespace-nowrap">
-                                            <Link to={`/devices/${device.id}`} className="text-gray-400 hover:text-amber-400 text-sm flex items-center transition">
-                                                Manage <MoreHorizontal className="w-4 h-4 ml-1" />
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                                    return (
+                                        <tr
+                                            key={device.id}
+                                            className="group hover:bg-white/[0.03] transition duration-300 cursor-pointer relative"
+                                        >
+                                            <td className="p-5 pl-8 whitespace-nowrap border-b border-white/5">
+                                                <div className="flex items-center">
+                                                    <div className="w-8 h-8 rounded-lg bg-gold/5 border border-gold/10 flex items-center justify-center mr-3 text-gold/80 group-hover:scale-110 group-hover:bg-gold/10 group-hover:text-gold group-hover:border-gold/30 transition duration-300">
+                                                        <Database className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="text-sm font-medium text-white group-hover:text-gold transition">{device.hostname}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-5 whitespace-nowrap text-sm text-gray-400 font-mono tracking-wide border-b border-white/5">{formatHost(device.mgmt_ip) || '-'}</td>
+                                            <td className="p-5 whitespace-nowrap border-b border-white/5">
+                                                <span className="text-xs font-medium text-gray-500 bg-white/5 px-2 py-1 rounded border border-white/5 group-hover:border-gold/10 transition">{device.site || 'Default'}</span>
+                                            </td>
+                                            <td className="p-5 whitespace-nowrap border-b border-white/5">
+                                                <span className={clsx(
+                                                    "px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full border shadow-sm transition-all duration-300",
+                                                    statusInfo.className
+                                                )}>
+                                                    {statusInfo.label}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 whitespace-nowrap text-xs text-gray-500 font-mono border-b border-white/5">
+                                                {lastSeen instanceof Date ? formatDistanceToNow(lastSeen, { addSuffix: true }) : lastSeen}
+                                            </td>
+                                            <td className="p-5 pr-8 whitespace-nowrap text-right border-b border-white/5">
+                                                <Link
+                                                    to={`/devices/${device.id}`}
+                                                    className="text-gray-500 hover:text-gold inline-flex items-center p-2 rounded-lg hover:bg-gold/10 transition duration-200"
+                                                >
+                                                    <span className="text-xs font-semibold mr-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -translate-x-2 group-hover:translate-x-0">Manage</span>
+                                                    <MoreHorizontal className="w-4 h-4" />
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Footer metadata */}
+                <div className="bg-white/5 p-3 border-t border-white/5 flex justify-between items-center text-[10px] text-gray-600 uppercase tracking-widest font-bold px-6">
+                    <span>Total: {filtered.length} Items</span>
+                    <span>System Status: Optimal</span>
+                </div>
             </div>
         </div>
     );
 }
+

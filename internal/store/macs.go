@@ -26,12 +26,12 @@ func (s *Store) UpsertMacEntries(ctx context.Context, entries []MACEntry) error 
 		if entry.VLAN != nil {
 			vlan = *entry.VLAN
 		}
-		batch.Queue(`INSERT INTO mac_entries (device_id, vlan, mac, learned_port, first_seen, last_seen)
-			VALUES ($1,$2,$3,$4,$5,$6)
+		batch.Queue(`INSERT INTO mac_entries (device_id, tenant_id, vlan, mac, learned_port, first_seen, last_seen)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)
 			ON CONFLICT (device_id, vlan, mac)
 			DO UPDATE SET learned_port=EXCLUDED.learned_port,
 				last_seen=EXCLUDED.last_seen`,
-			entry.DeviceID, vlan, strings.ToLower(entry.MAC), entry.IfIndex, entry.FirstSeen.UTC(), entry.LastSeen.UTC())
+			entry.DeviceID, entry.TenantID, vlan, strings.ToLower(entry.MAC), entry.IfIndex, entry.FirstSeen.UTC(), entry.LastSeen.UTC())
 	}
 	res := s.pool.SendBatch(ctx, batch)
 	defer res.Close()
@@ -45,9 +45,13 @@ func (s *Store) UpsertMacEntries(ctx context.Context, entries []MACEntry) error 
 
 // GetMacEntries returns MAC table rows using optional filters.
 func (s *Store) GetMacEntries(ctx context.Context, tenantID string, filter MACFilter) ([]MACEntry, error) {
-	query := `SELECT m.device_id, m.tenant_id, m.vlan, m.mac, m.learned_port, m.first_seen, m.last_seen 
+	query := `SELECT 
+			m.device_id, m.tenant_id, m.vlan, m.mac, m.learned_port, m.first_seen, m.last_seen,
+			d.hostname, d.mgmt_ip::text,
+			COALESCE(i.if_name, ''), COALESCE(i.if_descr, ''), COALESCE(i.oper_status, 'unknown')
 		FROM mac_entries m
-		JOIN devices d ON m.device_id = d.id`
+		JOIN devices d ON m.device_id = d.id
+		LEFT JOIN interfaces i ON m.device_id = i.device_id AND m.learned_port = i.if_index`
 	clauses := []string{"m.tenant_id=$1"}
 	args := []any{tenantID}
 
@@ -78,7 +82,11 @@ func (s *Store) GetMacEntries(ctx context.Context, tenantID string, filter MACFi
 	var list []MACEntry
 	for rows.Next() {
 		var entry MACEntry
-		if err := rows.Scan(&entry.DeviceID, &entry.TenantID, &entry.VLAN, &entry.MAC, &entry.IfIndex, &entry.FirstSeen, &entry.LastSeen); err != nil {
+		if err := rows.Scan(
+			&entry.DeviceID, &entry.TenantID, &entry.VLAN, &entry.MAC, &entry.IfIndex, &entry.FirstSeen, &entry.LastSeen,
+			&entry.DeviceHostname, &entry.DeviceMgmtIP,
+			&entry.PortName, &entry.PortDescr, &entry.PortOperStatus,
+		); err != nil {
 			return nil, err
 		}
 		list = append(list, entry)

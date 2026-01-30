@@ -28,6 +28,22 @@ type HTTPServer struct {
 	deviceReg DeviceRegistrar
 }
 
+type macEntryView struct {
+	DeviceID        int64     `json:"device_id"`
+	DeviceHostname  string    `json:"device_hostname,omitempty"`
+	DeviceMgmtIP    string    `json:"device_mgmt_ip,omitempty"`
+	DeviceSite      string    `json:"device_site,omitempty"`
+	VLAN            *int      `json:"vlan"`
+	MAC             string    `json:"mac"`
+	IfIndex         *int      `json:"if_index"`
+	PortName        string    `json:"port_name,omitempty"`
+	PortDescr       string    `json:"port_descr,omitempty"`
+	PortOperStatus  string    `json:"port_oper_status,omitempty"`
+	PortAdminStatus string    `json:"port_admin_status,omitempty"`
+	FirstSeen       time.Time `json:"first_seen"`
+	LastSeen        time.Time `json:"last_seen"`
+}
+
 // NewHTTPServer configures the API server.
 func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
 	encryptor, err := security.NewEncryptorFromEnv()
@@ -305,6 +321,7 @@ func (s *HTTPServer) handleDeviceMacs(c *gin.Context) {
 		s.respondErr(c, err)
 		return
 	}
+	// Simplified: GetMacEntries now returns joined fields.
 	c.JSON(http.StatusOK, gin.H{"mac_entries": macs})
 }
 
@@ -326,6 +343,7 @@ func (s *HTTPServer) handleListMacs(c *gin.Context) {
 		s.respondErr(c, err)
 		return
 	}
+	// Simplified: GetMacEntries now returns joined fields.
 	c.JSON(http.StatusOK, gin.H{"mac_entries": macs})
 }
 

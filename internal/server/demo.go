@@ -8,6 +8,7 @@ import (
 
 	"github.com/fresatu/snmp-poller/internal/store"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 func (s *HTTPServer) handleDemoSeed(c *gin.Context) {
@@ -115,12 +116,66 @@ func (s *HTTPServer) handleDemoSeed(c *gin.Context) {
 					stats["devices_seeded"] = stats["devices_seeded"].(int) + 1
 				}
 
+				// Seed Interfaces
+				ifCount := rand.Intn(16) + 8 // 8 to 24 ports
+				interfaces := []store.InterfaceState{}
+				counters := []store.InterfaceCounters{}
+				var validIndices []int
+
+				for p := 1; p <= ifCount; p++ {
+					validIndices = append(validIndices, p)
+					operStatus := "down"
+					if rand.Float32() < 0.7 { // 70% active
+						operStatus = "up"
+					}
+
+					speed := uint64(1000000000) // 1Gbps
+					if p >= 25 {
+						speed = 10000000000 // 10Gbps uplinks
+					}
+
+					updatedAt := time.Now()
+					iface := store.InterfaceState{
+						DeviceID:        devID,
+						IfIndex:         p,
+						IfName:          fmt.Sprintf("Gi1/0/%d", p),
+						IfDescr:         fmt.Sprintf("GigabitEthernet1/0/%d", p),
+						AdminStatus:     "up",
+						OperStatus:      operStatus,
+						Speed:           speed,
+						StatusChangedAt: updatedAt.Add(-time.Duration(rand.Intn(48)) * time.Hour),
+						UpdatedAt:       updatedAt,
+					}
+					interfaces = append(interfaces, iface)
+
+					if operStatus == "up" {
+						counters = append(counters, store.InterfaceCounters{
+							DeviceID:    devID,
+							IfIndex:     p,
+							InOctets:    uint64(rand.Intn(1000000000)),
+							OutOctets:   uint64(rand.Intn(1000000000)),
+							InErrors:    uint64(rand.Intn(100)),
+							OutErrors:   uint64(rand.Intn(10)),
+							CollectedAt: updatedAt,
+						})
+					}
+				}
+
+				if err := s.store.UpsertInterfaces(c.Request.Context(), devID, interfaces); err == nil {
+					// Seed counters if interfaces saved
+					_ = s.store.InsertInterfaceCounters(c.Request.Context(), counters)
+				}
+
 				// Seed MACs for this device
 				macCount := rand.Intn(25) + 5
 				macEntries := []store.MACEntry{}
 				for m := 0; m < macCount; m++ {
 					vlan := rand.Intn(4094) + 1
-					ifIndex := rand.Intn(48) + 1
+					ifIndex := 1
+					if len(validIndices) > 0 {
+						ifIndex = validIndices[rand.Intn(len(validIndices))]
+					}
+
 					mac := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
 						rand.Intn(256), rand.Intn(256), rand.Intn(256),
 						rand.Intn(256), rand.Intn(256), rand.Intn(256))
@@ -137,6 +192,8 @@ func (s *HTTPServer) handleDemoSeed(c *gin.Context) {
 				}
 				if err := s.store.UpsertMacEntries(c.Request.Context(), macEntries); err == nil {
 					stats["macs_seeded"] = stats["macs_seeded"].(int) + len(macEntries)
+				} else {
+					log.Error().Err(err).Str("device", dev.Hostname).Msg("seeding macs failed")
 				}
 
 				// Seed Alerts
