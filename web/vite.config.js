@@ -6,12 +6,30 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/healthz': 'http://localhost:8080',
-      '/devices': 'http://localhost:8080',
-      '/alerts': 'http://localhost:8080',
-      '/discovery': 'http://localhost:8080',
-      '/macs': 'http://localhost:8080',
-      '/metrics': 'http://localhost:8080',
+      '/healthz': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
+      '/devices': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
+      '/alerts': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
+      '/discovery': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
+      '/macs': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
+      '/metrics': {
+        target: 'http://localhost:8080',
+        bypass: (req) => (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined,
+      },
     }
   }
 })

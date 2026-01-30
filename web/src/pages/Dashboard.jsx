@@ -4,6 +4,7 @@ import { api } from '../api';
 import { AlertCircle, Server, ToggleRight, GitMerge, Bug, Octagon, ArrowRight, BarChart2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+import { getDeviceStatusInfo } from '../utils/deviceStatus';
 
 export function Dashboard() {
     const [stats, setStats] = useState({ devices: 0, alerts: 0, up: 0, down: 0 });
@@ -23,7 +24,7 @@ export function Dashboard() {
                 ]);
 
                 const devs = devData.devices || [];
-                const upCount = devs.filter(d => (new Date() - new Date(d.last_seen)) < 120000).length;
+                const upCount = devs.filter(d => getDeviceStatusInfo(d.status, d.last_seen).label === 'Healthy').length;
 
                 setStats({
                     devices: devs.length,

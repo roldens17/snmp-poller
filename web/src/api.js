@@ -21,10 +21,20 @@ async function fetchWithTimeout(path, options = {}) {
                 // retry once for transient status codes
                 return fetchWithTimeout(path, { ...options, retryOn: [], timeout });
             }
-            const text = await response.text();
+            const contentType = response.headers.get("content-type") || "";
+            let body = null;
+            try {
+                if (contentType.includes("application/json")) {
+                    body = await response.json();
+                } else {
+                    body = await response.text();
+                }
+            } catch {
+                body = null;
+            }
             const err = new Error(`Request failed with status ${response.status}`);
             err.status = response.status;
-            err.body = text;
+            err.body = body;
             throw err;
         }
 
@@ -68,4 +78,12 @@ export const api = {
     createAlertDestination: (data) => postJson(`/alert-destinations`, data),
     updateAlertDestination: (id, data) => fetchWithTimeout(`/alert-destinations/${id}`, { method: 'PATCH', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } }),
     deleteAlertDestination: (id) => fetchWithTimeout(`/alert-destinations/${id}`, { method: 'DELETE' }),
+    testSnmp: (data) => fetchWithTimeout(`/api/devices/test-snmp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        timeout: 20000,
+    }),
+    createDevice: (data) => postJson(`/api/devices`, data),
+    deleteDevice: (id) => fetchWithTimeout(`/devices/${id}`, { method: 'DELETE' }),
 };

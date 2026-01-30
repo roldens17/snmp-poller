@@ -5,6 +5,7 @@ import { Search, Filter, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { StatusMessage } from '../components/StatusMessage';
+import { formatHost, formatLastSeen, getDeviceStatusInfo } from '../utils/deviceStatus';
 
 export function Switches() {
     const [devices, setDevices] = useState([]);
@@ -85,24 +86,24 @@ export function Switches() {
                             <tr><td colSpan="6" className="p-6"><StatusMessage variant="empty" title="No switches match your search." /></td></tr>
                         ) : (
                             filtered.map(device => {
-                                const lastSeen = device.last_seen ? new Date(device.last_seen) : null;
-                                const isOnline = lastSeen && (new Date() - lastSeen) < 120000;
+                                const lastSeen = formatLastSeen(device.last_seen);
+                                const statusInfo = getDeviceStatusInfo(device.status, device.last_seen);
 
                                 return (
                                     <tr key={device.id} className="border-b border-gray-700 hover:bg-gray-700/50 transition duration-150 cursor-pointer group">
                                         <td className="p-4 whitespace-nowrap text-sm font-bold text-amber-500 group-hover:text-amber-300 transition">{device.hostname}</td>
-                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300 font-mono">{device.mgmt_ip || '-'}</td>
+                                        <td className="p-4 whitespace-nowrap text-sm text-gray-300 font-mono">{formatHost(device.mgmt_ip) || '-'}</td>
                                         <td className="p-4 whitespace-nowrap text-sm text-gray-300">{device.site || '-'}</td>
                                         <td className="p-4 whitespace-nowrap">
                                             <span className={clsx(
                                                 "px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full border",
-                                                isOnline ? "bg-green-900 text-green-200 border-green-800" : "bg-red-900 text-red-200 border-red-800"
+                                                statusInfo.className
                                             )}>
-                                                {isOnline ? 'Healthy' : 'Offline'}
+                                                {statusInfo.label}
                                             </span>
                                         </td>
                                         <td className="p-4 whitespace-nowrap text-xs text-gray-400 font-mono">
-                                            {lastSeen ? formatDistanceToNow(lastSeen, { addSuffix: true }) : 'Never'}
+                                            {lastSeen instanceof Date ? formatDistanceToNow(lastSeen, { addSuffix: true }) : lastSeen}
                                         </td>
                                         <td className="p-4 whitespace-nowrap">
                                             <Link to={`/devices/${device.id}`} className="text-gray-400 hover:text-amber-400 text-sm flex items-center transition">

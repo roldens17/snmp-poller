@@ -31,7 +31,7 @@ Production-ready Go service that polls network switches via SNMP v2c, stores sta
 ### Troubleshooting
 If the `snmp-poller` container exits with `"define at least one enabled switch..."`, ensure `config.yaml` exists in the repo root, has `enabled: true` for at least one switch, and is correctly mounted to `/config.yaml` as defined in `compose.yaml`.
 
-REST API defaults to `http://localhost:8080`, Prometheus metrics on `:9105/metrics` when enabled.
+REST API defaults to `http://localhost:8080`. When metrics are enabled, `/metrics` is exposed on the same HTTP server and can be made public or kept behind auth via `metrics.public`.
 
 To run locally without containers, set `POSTGRES_DSN` and other env vars (see `.env.example`), adjust `config.yaml`, then:
 ```sh
@@ -53,11 +53,13 @@ go run ./cmd/snmp-poller -config config.yaml
 - Env overrides (examples): `POSTGRES_DSN`, `HTTP_ADDR`, `POLL_INTERVAL`, `WORKER_COUNT`, `METRICS_ENABLED`, `DISCOVERY_ENABLED`, `ALERT_ERROR_RATE`, `ALERT_BANDWIDTH`.
 - CORS env override: `CORS_ALLOWED_ORIGINS` (comma-separated).
 - Auth env vars: `AUTH_JWT_SECRET` (required), `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`, `AUTH_TOKEN_TTL_HOURS`, `AUTH_ALLOW_REGISTER`.
+- Device registration env var: `ENCRYPTION_KEY` (required for SNMP credential encryption; 32-byte raw or base64).
 
 ## API Highlights
 - `GET /healthz`
 - `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` (optional `POST /auth/register` when enabled)
 - `GET /devices`, `GET /devices/:id`
+- `POST /api/devices/test-snmp`, `POST /api/devices`
 - `GET /devices/:id/interfaces`
 - `GET /devices/:id/macs`, `GET /macs?mac=<prefix>&device_id=&vlan=`
 - `GET /alerts?active=true`
@@ -77,6 +79,15 @@ See `migrations/001_init.up.sql` for details:
 - Requires Go 1.21+ for local builds. This environment currently lacks the Go toolchain, so `go build`/`gofmt` could not be executed here.
 - Migrations are embedded and run automatically on startup.
 - The worker pool, discovery loop, and metrics can be tuned via config/env variables.
+- The poller currently uses YAML-defined `switches` as its polling source; device registration APIs (`/devices/test-snmp`, `/devices`) are used to onboard devices and store encrypted SNMP config but do not yet drive the periodic poll loop.
+
+## Testing
+- Run all backend tests:
+  - `go test ./...`
+- Example focused test for device registration tokens:
+  - `go test ./internal/devicereg -run TestValidateDeviceTest`
+- Frontend tests from `web/`:
+  - `npm test`
 
 ## Auth Smoke Tests
 

@@ -47,6 +47,9 @@ func (s *Store) UpsertAlert(ctx context.Context, alert Alert) (*Alert, bool, err
 }
 
 // ResolveAlert marks an alert as resolved and returns the resolved alert if found.
+//
+// The COALESCE(if_index, -1) pattern ensures that interface-less alerts
+// (if_index IS NULL) are matched consistently using a sentinel value.
 func (s *Store) ResolveAlert(ctx context.Context, tenantID string, deviceID int64, ifIndex *int, category string) (*Alert, error) {
 	var alert Alert
 	err := s.pool.QueryRow(ctx, `

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
-import { Search, Filter, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { StatusMessage } from '../components/StatusMessage';
@@ -39,6 +40,13 @@ export function Devices() {
             <div className="flex flex-col md:flex-row justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-100">Device Inventory <span className="text-gray-500 text-base font-normal">({macs.length})</span></h2>
                 <div className="flex mt-4 md:mt-0 space-x-2 w-full md:w-auto">
+                    <Link
+                        to="/devices/new"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 text-black text-sm font-semibold hover:bg-amber-400 transition"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Device
+                    </Link>
                     <div className="relative flex-1 md:flex-initial">
                         <Search className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
                         <input

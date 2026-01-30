@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { Briefcase } from 'lucide-react';
+import { formatHost, getDeviceStatusInfo } from '../utils/deviceStatus';
 
 export function DeviceDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [device, setDevice] = useState(null);
     const [interfaces, setInterfaces] = useState([]);
     const [macs, setMacs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
     const [activeTab, setActiveTab] = useState('interfaces'); // 'interfaces' | 'macs'
 
     useEffect(() => {
@@ -36,25 +40,56 @@ export function DeviceDetail() {
     if (loading) return <div className="p-8 text-center text-amber-500 animate-pulse">Loading Device Details...</div>;
     if (!device) return <div className="p-8 text-center text-red-400">Device not found</div>;
 
-    const isOnline = (new Date() - new Date(device.last_seen)) < 120000;
+    const statusInfo = getDeviceStatusInfo(device.status, device.last_seen);
+
+    const handleDelete = async () => {
+        if (deleting) return;
+        setDeleteError('');
+        if (!window.confirm('Delete this device and all associated data?')) return;
+        setDeleting(true);
+        try {
+            await api.deleteDevice(id);
+            navigate('/devices', { replace: true });
+        } catch (err) {
+            console.error('Failed to delete device', err);
+            setDeleteError('Unable to delete device right now.');
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-6 fade-in h-full">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="margin-0 text-2xl font-bold text-gray-100 flex items-center gap-2">
                         <Briefcase className="w-6 h-6 text-amber-400" />
                         {device.hostname}
                     </h1>
-                    <div className="text-gray-400 mt-1 font-mono text-sm">{device.mgmt_ip} • {device.site}</div>
+                    <div className="text-gray-400 mt-1 font-mono text-sm">{formatHost(device.mgmt_ip)} • {device.site}</div>
                 </div>
-                <span className={clsx(
-                    "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border",
-                    isOnline ? "bg-green-900 text-green-200 border-green-800" : "bg-red-900 text-red-200 border-red-800"
-                )}>
-                    {isOnline ? 'Online' : 'Offline'}
-                </span>
+                <div className="flex items-center gap-3">
+                    <span className={clsx(
+                        "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border",
+                        statusInfo.className
+                    )}>
+                        {statusInfo.label}
+                    </span>
+                    <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                    >
+                        {deleting ? 'Deleting...' : 'Delete Device'}
+                    </button>
+                </div>
             </div>
+
+            {deleteError && (
+                <div className="mt-3 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                    {deleteError}
+                </div>
+            )}
 
             <div>
                 <div className="flex space-x-4 border-b border-gray-700 mb-4">

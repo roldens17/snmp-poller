@@ -32,17 +32,35 @@ type User struct {
 
 // Device represents a managed switch.
 type Device struct {
-	ID          int64     `json:"id"`
-	TenantID    string    `json:"tenant_id"`
-	Hostname    string    `json:"hostname"`
-	MgmtIP      string    `json:"mgmt_ip"`
-	Community   string    `json:"snmp_community"`
-	Enabled     bool      `json:"enabled"`
-	Site        string    `json:"site"`
-	Description string    `json:"description"`
-	LastSeen    time.Time `json:"last_seen"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                     int64      `json:"id"`
+	TenantID               string     `json:"tenant_id"`
+	Hostname               string     `json:"hostname"`
+	MgmtIP                 string     `json:"mgmt_ip"`
+	Community              string     `json:"-"`
+	Enabled                bool       `json:"enabled"`
+	Site                   string     `json:"site"`
+	Description            string     `json:"description"`
+	LastSeen               *time.Time `json:"last_seen"`
+	DeviceType             string     `json:"device_type"`
+	SNMPVersion            string     `json:"snmp_version"`
+	SNMPConfigEncrypted    []byte     `json:"-"`
+	PollingIntervalSeconds int        `json:"polling_interval_seconds"`
+	Tags                   []string   `json:"tags"`
+	Status                 string     `json:"status"`
+	LastTestedAt           *time.Time `json:"last_tested_at"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+}
+
+// DeviceTest represents a stored SNMP validation token.
+type DeviceTest struct {
+	ID                  string    `json:"id"`
+	TenantID            string    `json:"tenant_id"`
+	IP                  string    `json:"ip"`
+	SNMPFingerprintHash string    `json:"snmp_fingerprint_hash"`
+	TestToken           string    `json:"test_token"`
+	ExpiresAt           time.Time `json:"expires_at"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // InterfaceState captures the latest administrative and traffic state.

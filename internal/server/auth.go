@@ -171,6 +171,15 @@ func (s *HTTPServer) handleAuthLogin(c *gin.Context) {
 		return
 	}
 	initialTenantID := tenants[0].ID
+	// Prefer the configured default tenant slug when the user belongs to it.
+	if slug := s.cfg.DefaultTenantSlug; slug != "" {
+		for _, t := range tenants {
+			if t.Slug == slug {
+				initialTenantID = t.ID
+				break
+			}
+		}
+	}
 
 	token, err := s.auth.CreateJWT(user.ID, user.Email, user.Role, initialTenantID)
 	if err != nil {
@@ -193,7 +202,11 @@ func (s *HTTPServer) handleAuthMe(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": toAuthUserResponse(user)})
+	resp := gin.H{"user": toAuthUserResponse(user)}
+	if tenant, ok := s.getAuthTenant(c); ok && tenant != nil {
+		resp["tenant"] = tenant
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (s *HTTPServer) handleAuthRegister(c *gin.Context) {

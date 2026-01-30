@@ -15,19 +15,31 @@ import (
 
 	"github.com/fresatu/snmp-poller/internal/auth"
 	"github.com/fresatu/snmp-poller/internal/config"
+	"github.com/fresatu/snmp-poller/internal/devicereg"
+	"github.com/fresatu/snmp-poller/internal/security"
 	"github.com/fresatu/snmp-poller/internal/store"
 )
 
 // HTTPServer exposes REST + metrics endpoints.
 type HTTPServer struct {
-	cfg   *config.Config
-	store *store.Store
-	auth  *auth.Service
+	cfg       *config.Config
+	store     *store.Store
+	auth      *auth.Service
+	deviceReg DeviceRegistrar
 }
 
 // NewHTTPServer configures the API server.
 func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
-	return &HTTPServer{cfg: cfg, store: db, auth: auth.NewService(cfg.Auth)}
+	encryptor, err := security.NewEncryptorFromEnv()
+	if err != nil {
+		log.Warn().Err(err).Msg("device registration encryption disabled")
+	}
+	return &HTTPServer{
+		cfg:       cfg,
+		store:     db,
+		auth:      auth.NewService(cfg.Auth),
+		deviceReg: devicereg.NewService(db, encryptor),
+	}
 }
 
 // Run starts the HTTP listener until ctx cancellation.
@@ -65,8 +77,8 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 			h := c.Writer.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
-			h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID")
 			h.Set("Access-Control-Allow-Credentials", "true")
 			if c.Request.Method == http.MethodOptions {
 				c.AbortWithStatus(http.StatusNoContent)
@@ -130,6 +142,15 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/devices/:id", s.handleGetDevice)
 	protected.GET("/devices/:id/interfaces", s.handleDeviceInterfaces)
 	protected.GET("/devices/:id/macs", s.handleDeviceMacs)
+	protected.POST("/devices/test-snmp", s.handleTestSNMP)
+	protected.POST("/devices", s.handleCreateDevice)
+	protected.DELETE("/devices/:id", s.handleDeleteDevice)
+
+	api := protected.Group("/api")
+	api.GET("/devices", s.handleListDevices)
+	api.POST("/devices", s.handleCreateDevice)
+	api.POST("/devices/test-snmp", s.handleTestSNMP)
+	api.DELETE("/devices/:id", s.handleDeleteDevice)
 	protected.GET("/macs", s.handleListMacs)
 	protected.GET("/alert-destinations", s.handleListAlertDestinations)
 	protected.POST("/alert-destinations", s.handleCreateAlertDestination)
@@ -138,7 +159,11 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 
 	protected.GET("/alerts", s.handleListAlerts)
 	if s.cfg.Metrics.Enabled {
-		protected.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		if s.cfg.Metrics.Public {
+			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		} else {
+			protected.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		}
 	}
 
 	engine.GET("/discovery", s.authRequired(), s.handleDiscovery)
@@ -215,6 +240,24 @@ func (s *HTTPServer) handleGetDevice(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, device)
+}
+
+func (s *HTTPServer) handleDeleteDevice(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	tenantID := s.getTenantID(c)
+	if err := s.store.DeleteDevice(c.Request.Context(), tenantID, id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		s.respondErr(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (s *HTTPServer) handleDeviceInterfaces(c *gin.Context) {

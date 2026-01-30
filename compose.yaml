@@ -16,6 +16,8 @@ services:
       POSTGRES_USER: snmp
       POSTGRES_PASSWORD: snmp
       POSTGRES_DB: snmp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -39,4 +41,8 @@ services:
       AUTH_ALLOW_REGISTER: "false"
       AUTH_JWT_SECRET: "dev-super-secret-change-me"
       DEMO_MODE: "true"
+      ENCRYPTION_KEY: "YcLhDfQcycJN2k5VQBmvrx3y/McF+bVrn4ampNgjGBA="
+     
 
+volumes:
+  pgdata:

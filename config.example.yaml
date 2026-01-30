@@ -1,5 +1,6 @@
 poll_interval: 1m
 worker_count: 6
+poller_device_limit: 5
 http:
   addr: ":8080"
   allowed_origins:

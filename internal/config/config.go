@@ -42,16 +42,21 @@ type Config struct {
 	// DemoMode enables demo endpoints.
 	DemoMode bool `yaml:"demo_mode"`
 
-	PollInterval Duration       `yaml:"poll_interval"`
-	WorkerCount  int            `yaml:"worker_count"`
-	Switches     []Switch       `yaml:"switches"`
-	Postgres     PostgresConfig `yaml:"postgres"`
-	HTTP         HTTPConfig     `yaml:"http"`
-	Auth         AuthConfig     `yaml:"auth"`
-	SNMP         SNMPDefaults   `yaml:"snmp_defaults"`
-	Discovery    Discovery      `yaml:"discovery"`
-	Alerting     Alerting       `yaml:"alerts"`
-	Metrics      Metrics        `yaml:"metrics"`
+	// DefaultTenantSlug is the slug for the default tenant used by poller and auth.
+	DefaultTenantSlug string `yaml:"default_tenant_slug"`
+
+	PollInterval Duration `yaml:"poll_interval"`
+	WorkerCount  int      `yaml:"worker_count"`
+	// PollerDeviceLimit caps number of DB-backed devices polled per tick (0 = no limit).
+	PollerDeviceLimit int            `yaml:"poller_device_limit"`
+	Switches          []Switch       `yaml:"switches"`
+	Postgres          PostgresConfig `yaml:"postgres"`
+	HTTP              HTTPConfig     `yaml:"http"`
+	Auth              AuthConfig     `yaml:"auth"`
+	SNMP              SNMPDefaults   `yaml:"snmp_defaults"`
+	Discovery         Discovery      `yaml:"discovery"`
+	Alerting          Alerting       `yaml:"alerts"`
+	Metrics           Metrics        `yaml:"metrics"`
 }
 
 // Switch describes an SNMP-enabled switch target.
@@ -66,6 +71,7 @@ type Switch struct {
 	Enabled     *bool    `yaml:"enabled"`
 	Site        string   `yaml:"site"`
 	Description string   `yaml:"description"`
+	DeviceID    int64    `yaml:"-"`
 }
 
 // EnabledValue returns true when switch should be polled.
@@ -84,12 +90,13 @@ type PostgresConfig struct {
 
 // HTTPConfig configures the REST server.
 type HTTPConfig struct {
-	Addr           string   `yaml:"addr"`
-	EnableTLS      bool     `yaml:"enable_tls"`
-	CertFile       string   `yaml:"cert_file"`
-	KeyFile        string   `yaml:"key_file"`
-	EnableDebug    bool     `yaml:"debug"`
-	AllowedOrigins []string `yaml:"allowed_origins"`
+	Addr             string   `yaml:"addr"`
+	EnableTLS        bool     `yaml:"enable_tls"`
+	CertFile         string   `yaml:"cert_file"`
+	KeyFile          string   `yaml:"key_file"`
+	EnableDebug      bool     `yaml:"debug"`
+	AllowedOrigins   []string `yaml:"allowed_origins"`
+	DashboardBaseURL string   `yaml:"dashboard_base_url"`
 }
 
 // AuthConfig defines authentication settings.
@@ -138,6 +145,8 @@ type Alerting struct {
 type Metrics struct {
 	Enabled bool   `yaml:"enabled"`
 	Addr    string `yaml:"addr"`
+	// Public controls whether /metrics is public (false = requires auth).
+	Public bool `yaml:"public"`
 }
 
 // Load reads the YAML file (if present) and returns Config. Empty path skips file read.
@@ -178,7 +187,7 @@ func (c *Config) Validate() error {
 	}
 
 	if active == 0 && !c.Discovery.Enabled {
-		return errors.New("define at least one enabled switch or turn on discovery")
+		return errors.New("define at least one enabled switch (in config.yaml or via env) or enable discovery (discovery.enabled: true or DISCOVERY_ENABLED=1)")
 	}
 
 	if c.Postgres.DSN == "" {
@@ -198,11 +207,20 @@ func (c *Config) applyDefaults() {
 	if c.WorkerCount == 0 {
 		c.WorkerCount = 4
 	}
+	if c.PollerDeviceLimit < 0 {
+		c.PollerDeviceLimit = 0
+	}
+	if c.DefaultTenantSlug == "" {
+		c.DefaultTenantSlug = "default"
+	}
 	if c.HTTP.Addr == "" {
 		c.HTTP.Addr = ":8080"
 	}
 	if len(c.HTTP.AllowedOrigins) == 0 {
 		c.HTTP.AllowedOrigins = []string{"http://localhost:3000"}
+	}
+	if c.HTTP.DashboardBaseURL == "" {
+		c.HTTP.DashboardBaseURL = "http://localhost:3000"
 	}
 	if c.Postgres.MaxConns == 0 {
 		c.Postgres.MaxConns = 8
@@ -290,6 +308,11 @@ func (c *Config) applyEnvOverrides() {
 			c.WorkerCount = i
 		}
 	}
+	if v := os.Getenv("POLL_DEVICE_LIMIT"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i >= 0 {
+			c.PollerDeviceLimit = i
+		}
+	}
 	if v := os.Getenv("HTTP_ADDR"); v != "" {
 		c.HTTP.Addr = v
 	}
@@ -355,5 +378,14 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := strings.TrimSpace(os.Getenv("DEMO_MODE")); v != "" {
 		c.DemoMode = v == "1" || strings.EqualFold(v, "true")
+	}
+	if v := strings.TrimSpace(os.Getenv("DEFAULT_TENANT_SLUG")); v != "" {
+		c.DefaultTenantSlug = v
+	}
+	if v := strings.TrimSpace(os.Getenv("DASHBOARD_BASE_URL")); v != "" {
+		c.HTTP.DashboardBaseURL = v
+	}
+	if v := strings.TrimSpace(os.Getenv("METRICS_PUBLIC")); v != "" {
+		c.Metrics.Public = v == "1" || strings.EqualFold(v, "true")
 	}
 }
