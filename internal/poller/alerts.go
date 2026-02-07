@@ -94,3 +94,36 @@ func (s *Service) clearAlert(ctx context.Context, tenantID string, deviceID int6
 		s.notifier.Dispatch(ctx, tenantID, notification.EventAlertResolved, *resolvedAlert)
 	}
 }
+
+func (s *Service) raiseDeviceAlert(ctx context.Context, tenantID string, deviceID int64, category, severity, message string) {
+	alert := store.Alert{
+		TenantID: tenantID,
+		DeviceID: deviceID,
+		Category: category,
+		Severity: severity,
+		Message:  message,
+		Metadata: "{}",
+	}
+
+	savedAlert, created, err := s.store.UpsertAlert(ctx, alert)
+	if err != nil {
+		log.Warn().Err(err).Msg("raise device alert failed")
+		return
+	}
+
+	if created {
+		s.notifier.Dispatch(ctx, tenantID, notification.EventAlertCreated, *savedAlert)
+	}
+}
+
+func (s *Service) clearDeviceAlert(ctx context.Context, tenantID string, deviceID int64, category string) {
+	resolvedAlert, err := s.store.ResolveAlert(ctx, tenantID, deviceID, nil, category)
+	if err != nil {
+		log.Warn().Err(err).Msg("resolve device alert failed")
+		return
+	}
+
+	if resolvedAlert != nil {
+		s.notifier.Dispatch(ctx, tenantID, notification.EventAlertResolved, *resolvedAlert)
+	}
+}

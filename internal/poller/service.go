@@ -211,7 +211,7 @@ func (s *Service) worker(ctx context.Context, id int) {
 			if err != nil {
 				logger.Warn().Err(err).Str("device", sw.Name).Msg("poll failed")
 				s.metrics.observeError(sw.Name)
-				s.markDeviceFailure(ctx, sw)
+				s.markDeviceFailure(ctx, sw, err)
 			} else {
 				s.metrics.observeDuration(sw.Name, time.Since(start))
 			}
@@ -326,6 +326,7 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 	if err := s.store.UpsertMacEntries(ctx, macEntries); err != nil {
 		logger.Warn().Err(err).Msg("mac table upsert")
 	}
+	s.clearDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down")
 	s.evaluateAlerts(ctx, s.defaultTenantID, deviceID, pollTime, ifaces, prevStates, prevCounters)
 	return nil
 }
@@ -341,9 +342,25 @@ func normalizeHost(raw string) string {
 	return trimmed
 }
 
-func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch) {
-	if sw.DeviceID > 0 {
-		if err := s.store.UpdateDeviceStatus(ctx, s.defaultTenantID, sw.DeviceID, "error", nil); err != nil {
+func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollErr error) {
+	deviceID := sw.DeviceID
+	if deviceID == 0 {
+		if id, ok, err := s.store.GetDeviceIDByHostname(ctx, s.defaultTenantID, sw.Name); err == nil && ok {
+			deviceID = id
+		} else if err != nil {
+			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to resolve device id by hostname")
+		} else if id, ok, err := s.store.GetDeviceIDByIP(ctx, s.defaultTenantID, normalizeHost(sw.Address)); err == nil && ok {
+			deviceID = id
+		} else if err != nil {
+			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to resolve device id by ip")
+		}
+	}
+	if deviceID > 0 {
+		msg := fmt.Sprintf("%s poll failed: %s", sw.Name, pollErr.Error())
+		s.raiseDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down", "critical", msg)
+	}
+	if deviceID > 0 {
+		if err := s.store.UpdateDeviceStatus(ctx, s.defaultTenantID, deviceID, "error", nil); err != nil {
 			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to update device status")
 		}
 		return

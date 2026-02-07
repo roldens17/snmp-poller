@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { getDeviceStatusInfo } from '../utils/deviceStatus';
 import { motion } from 'framer-motion';
+import { parseAPITimestamp } from '../utils/time';
 
 export function Dashboard() {
     const [stats, setStats] = useState({ devices: 0, alerts: 0, up: 0, down: 0 });
@@ -18,31 +19,33 @@ export function Dashboard() {
     useEffect(() => {
         async function load() {
             try {
-                const [devData, alertData, macsData] = await Promise.all([
+                const [devRes, alertRes, macsRes] = await Promise.allSettled([
                     api.getDevices(),
                     api.getAlerts(true),
                     api.getDeviceMacs(1) // Just fetching some macs to fake traffic data
                 ]);
 
-                const devs = devData.devices || [];
+                const devs = devRes.status === 'fulfilled' ? (devRes.value.devices || []) : [];
                 const upCount = devs.filter(d => getDeviceStatusInfo(d.status, d.last_seen).label === 'Healthy').length;
 
                 setStats({
                     devices: devs.length,
                     up: upCount,
                     down: devs.length - upCount,
-                    alerts: (alertData.alerts || []).length
+                    alerts: alertRes.status === 'fulfilled' ? (alertRes.value.alerts || []).length : 0
                 });
-                setAlerts(alertData.alerts || []);
+                setAlerts(alertRes.status === 'fulfilled' ? (alertRes.value.alerts || []) : []);
 
                 // Mocking traffic data
-                const mockTalkers = (macsData.mac_entries || []).slice(0, 5).map(m => ({
-                    name: 'Device ' + m.mac.slice(-5),
-                    mac: m.mac,
-                    traffic: Math.floor(Math.random() * 2000),
-                    deviceId: m.device_id
-                })).sort((a, b) => b.traffic - a.traffic);
-                setTopTalkers(mockTalkers);
+                if (macsRes.status === 'fulfilled') {
+                    const mockTalkers = (macsRes.value.mac_entries || []).slice(0, 5).map(m => ({
+                        name: 'Device ' + m.mac.slice(-5),
+                        mac: m.mac,
+                        traffic: Math.floor(Math.random() * 2000),
+                        deviceId: m.device_id
+                    })).sort((a, b) => b.traffic - a.traffic);
+                    setTopTalkers(mockTalkers);
+                }
 
             } catch (e) {
                 console.error(e);
@@ -261,7 +264,10 @@ export function Dashboard() {
                                     </div>
                                     <div className="mt-3 flex justify-end">
                                         <span className="text-[10px] text-gray-600 font-mono bg-black/20 px-2 py-1 rounded">
-                                            {formatDistanceToNow(new Date(alert.triggered_at), { addSuffix: true })}
+                                            {(() => {
+                                                const ts = parseAPITimestamp(alert.triggered_at);
+                                                return ts ? formatDistanceToNow(ts, { addSuffix: true }) : 'unknown';
+                                            })()}
                                         </span>
                                     </div>
                                 </li>

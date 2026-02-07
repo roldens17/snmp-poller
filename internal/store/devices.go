@@ -201,6 +201,19 @@ func (s *Store) GetDeviceIDByIP(ctx context.Context, tenantID, ip string) (int64
 	return id, true, nil
 }
 
+// GetDeviceIDByHostname returns device id by tenant and hostname.
+func (s *Store) GetDeviceIDByHostname(ctx context.Context, tenantID, hostname string) (int64, bool, error) {
+	var id int64
+	err := s.pool.QueryRow(ctx, `SELECT id FROM devices WHERE tenant_id=$1 AND hostname=$2 LIMIT 1`, tenantID, hostname).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	return id, true, nil
+}
+
 // CreateDevice inserts a registered device record.
 func (s *Store) CreateDevice(ctx context.Context, d *Device) (*Device, error) {
 	const q = `INSERT INTO devices

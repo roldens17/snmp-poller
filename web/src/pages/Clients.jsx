@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Search, Filter, MoreHorizontal, Plus, Smartphone, Router } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { parseAPITimestamp } from '../utils/time';
 import clsx from 'clsx';
 import { StatusMessage } from '../components/StatusMessage';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -147,7 +148,10 @@ export function Clients() {
                                                 )}
                                             </td>
                                             <td className="p-5 whitespace-nowrap text-xs text-gray-500 font-mono border-b border-white/5">
-                                                {formatDistanceToNow(new Date(m.last_seen), { addSuffix: true })}
+                                                {(() => {
+                                                    const ts = parseAPITimestamp(m.last_seen);
+                                                    return ts ? formatDistanceToNow(ts, { addSuffix: true }) : 'never';
+                                                })()}
                                             </td>
                                             <td className="p-5 pr-8 whitespace-nowrap text-right border-b border-white/5">
                                                 <button className="text-gray-500 hover:text-gold inline-flex items-center p-2 rounded-lg hover:bg-gold/10 transition duration-200">

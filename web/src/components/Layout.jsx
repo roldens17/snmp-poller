@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, Menu, Bell, Settings } from 'lucide-react';
+import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, Menu, Bell, Settings, RefreshCw, CircleDot } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { api } from '../api';
@@ -10,6 +10,8 @@ export function Layout({ children, user, onLogout }) {
     const [tenants, setTenants] = useState([]);
     const [activeTenant, setActiveTenant] = useState(null);
     const [loadingTenants, setLoadingTenants] = useState(false);
+    const [systemStatus, setSystemStatus] = useState({ state: 'checking', error: '', updatedAt: null });
+    const [alertCount, setAlertCount] = useState(0);
 
     // Fetch tenants on mount
     useEffect(() => {
@@ -24,6 +26,56 @@ export function Layout({ children, user, onLogout }) {
         }).finally(() => {
             setLoadingTenants(false);
         });
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        const checkStatus = async () => {
+            try {
+                const data = await api.getSystemStatus();
+                if (cancelled) return;
+                setSystemStatus({
+                    state: data.status || 'ok',
+                    error: '',
+                    updatedAt: data.time ? new Date(data.time) : new Date(),
+                });
+            } catch (err) {
+                if (cancelled) return;
+                setSystemStatus({
+                    state: 'degraded',
+                    error: err?.message || 'Unable to reach API',
+                    updatedAt: new Date(),
+                });
+            }
+        };
+        checkStatus();
+        const id = setInterval(checkStatus, 30000);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        const loadAlerts = async () => {
+            try {
+                const data = await api.getAlerts(true);
+                if (cancelled) return;
+                setAlertCount((data.alerts || []).length);
+            } catch {
+                if (cancelled) return;
+                setAlertCount(0);
+            }
+        };
+        loadAlerts();
+        const id = setInterval(loadAlerts, 30000);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
     }, [user]);
 
     const handleTenantChange = async (e) => {
@@ -167,6 +219,46 @@ export function Layout({ children, user, onLogout }) {
                         )}
 
                         <div className="h-4 w-[1px] bg-rich-dark hidden md:block"></div>
+                        <div className="hidden md:flex items-center gap-2 text-xs">
+                            <div className={clsx(
+                                "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border",
+                                systemStatus.state === 'ok'
+                                    ? "border-green-500/30 text-green-400 bg-green-500/5"
+                                    : "border-amber-400/30 text-amber-300 bg-amber-500/5"
+                            )}>
+                                <CircleDot className="w-3.5 h-3.5" />
+                                <span>
+                                    {systemStatus.state === 'ok'
+                                        ? 'API healthy'
+                                        : systemStatus.state === 'checking'
+                                            ? 'Checking...'
+                                            : 'API unreachable'}
+                                </span>
+                                {systemStatus.updatedAt && (
+                                    <span className="text-[10px] text-gray-400">checked {systemStatus.updatedAt.toLocaleTimeString()}</span>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSystemStatus(prev => ({ ...prev, state: 'checking' }));
+                                    api.getSystemStatus()
+                                        .then(data => setSystemStatus({
+                                            state: data.status || 'ok',
+                                            error: '',
+                                            updatedAt: data.time ? new Date(data.time) : new Date(),
+                                        }))
+                                        .catch(err => setSystemStatus({
+                                            state: 'degraded',
+                                            error: err?.message || 'Unable to reach API',
+                                            updatedAt: new Date(),
+                                        }));
+                                }}
+                                className="p-2 rounded-lg text-gray-400 hover:text-gold hover:bg-white/5 transition"
+                                title="Refresh status"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                            </button>
+                        </div>
 
                         {/* Demo Controls */}
                         <div className="flex gap-2">
@@ -194,10 +286,14 @@ export function Layout({ children, user, onLogout }) {
                             </button>
                         </div>
                         <div className="h-4 w-[1px] bg-rich-dark hidden md:block"></div>
-                        <button className="relative p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition group">
-                            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-rich-black animate-pulse"></span>
+                        <Link to="/alerts" className="relative p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition group">
+                            {alertCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] text-white font-bold flex items-center justify-center border border-rich-black shadow-[0_0_12px_rgba(239,68,68,0.6)]">
+                                    {alertCount > 99 ? '99+' : alertCount}
+                                </span>
+                            )}
                             <Bell className="w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] transition" />
-                        </button>
+                        </Link>
                         <div className="h-8 w-[1px] bg-rich-dark"></div>
                         <Link to="/settings" className="p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition">
                             <Settings className="w-5 h-5 hover:rotate-90 transition-transform duration-500" />
@@ -211,6 +307,34 @@ export function Layout({ children, user, onLogout }) {
                     <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-gold/5 to-transparent pointer-events-none"></div>
 
                     <div className="max-w-7xl mx-auto relative z-10">
+                        {systemStatus.state !== 'ok' && systemStatus.state !== 'checking' && (
+                            <div className="mb-4 px-4 py-3 rounded-xl border border-amber-400/40 bg-amber-500/10 text-amber-100 text-sm flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CircleDot className="w-4 h-4" />
+                                    <span>API unreachable or degraded. Some data may be stale.</span>
+                                    {systemStatus.error && <span className="text-amber-200/80 text-xs">({systemStatus.error})</span>}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setSystemStatus(prev => ({ ...prev, state: 'checking' }));
+                                        api.getSystemStatus()
+                                            .then(data => setSystemStatus({
+                                                state: data.status || 'ok',
+                                                error: '',
+                                                updatedAt: data.time ? new Date(data.time) : new Date(),
+                                            }))
+                                            .catch(err => setSystemStatus({
+                                                state: 'degraded',
+                                                error: err?.message || 'Unable to reach API',
+                                                updatedAt: new Date(),
+                                            }));
+                                    }}
+                                    className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:border-gold/30 hover:text-gold transition"
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        )}
                         {children}
                     </div>
                 </main>

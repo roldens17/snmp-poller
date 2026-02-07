@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { formatDistanceToNow } from 'date-fns';
+import { parseAPITimestamp } from '../utils/time';
 import clsx from 'clsx';
 import { Briefcase, Activity, Shield, Trash2, ArrowLeft } from 'lucide-react';
 import { formatHost, getDeviceStatusInfo } from '../utils/deviceStatus';
@@ -205,7 +206,12 @@ export function DeviceDetail() {
                                                 <div className="text-xs text-gray-500 mt-1">{m.port_descr}</div>
                                             )}
                                         </td>
-                                        <td className="p-4 pr-6 text-xs text-gray-500 font-mono tracking-wide">{m.last_seen ? `${formatDistanceToNow(new Date(m.last_seen))} ago` : 'never'}</td>
+                                        <td className="p-4 pr-6 text-xs text-gray-500 font-mono tracking-wide">
+                                            {(() => {
+                                                const ts = parseAPITimestamp(m.last_seen);
+                                                return ts ? `${formatDistanceToNow(ts)} ago` : 'never';
+                                            })()}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
