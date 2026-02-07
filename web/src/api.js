@@ -65,6 +65,7 @@ export const api = {
     getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`),
     getDiscovery: () => fetchWithTimeout(`/discovery`),
     getHealth: () => fetchWithTimeout(`/healthz`),
+    getSystemStatus: () => fetchWithTimeout(`/system/status`),
     login: (email, password) => postJson(`/auth/login`, { email, password }),
     logout: () => postJson(`/auth/logout`, {}),
     me: () => fetchWithTimeout(`/auth/me`),

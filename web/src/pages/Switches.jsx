@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Search, Filter, MoreHorizontal, Database, Server, Plus } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Database, Server, Plus, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { StatusMessage } from '../components/StatusMessage';
@@ -12,6 +12,7 @@ export function Switches() {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [lastUpdated, setLastUpdated] = useState(null);
 
     const loadDevices = async () => {
         setLoading(true);
@@ -20,6 +21,7 @@ export function Switches() {
             const data = await api.getDevices();
             const list = Array.isArray(data) ? data : data.devices || [];
             setDevices(list);
+            setLastUpdated(new Date());
         } catch (err) {
             console.error('Failed to load switches', err);
             setError('Unable to load switches right now. Check the API URL and try again.');
@@ -64,6 +66,14 @@ export function Switches() {
                         <Plus className="w-4 h-4" />
                         Add Switch
                     </Link>
+                    <button
+                        onClick={loadDevices}
+                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-sm font-semibold border border-white/10 transition"
+                        title="Refresh"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                    </button>
                     <div className="relative flex-1 md:flex-initial group">
                         <Search className="w-4 h-4 absolute left-3 top-3 text-gray-500 group-focus-within:text-gold transition" />
                         <input
@@ -152,10 +162,13 @@ export function Switches() {
                 {/* Footer metadata */}
                 <div className="bg-white/5 p-3 border-t border-white/5 flex justify-between items-center text-[10px] text-gray-600 uppercase tracking-widest font-bold px-6">
                     <span>Total: {filtered.length} Items</span>
-                    <span>System Status: Optimal</span>
+                    <span>
+                        {lastUpdated
+                            ? `Last updated ${formatDistanceToNow(lastUpdated, { addSuffix: true })}`
+                            : 'Waiting for first load'}
+                    </span>
                 </div>
             </div>
         </div>
     );
 }
-

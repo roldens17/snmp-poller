@@ -143,6 +143,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 
 	protected := engine.Group("/")
 	protected.Use(s.authRequired())
+	protected.GET("/system/status", s.handleSystemStatus)
 	protected.GET("/tenants", s.handleListTenants)
 	protected.GET("/tenants/active", s.handleGetActiveTenant)
 	protected.POST("/tenants/active", s.handleSwitchTenant)
@@ -376,6 +377,27 @@ func (s *HTTPServer) handleDiscovery(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"discoveries": records})
+}
+
+func (s *HTTPServer) handleSystemStatus(c *gin.Context) {
+	status := gin.H{
+		"status":          "ok",
+		"time":            time.Now().UTC(),
+		"metrics_enabled": s.cfg.Metrics.Enabled,
+		"metrics_public":  s.cfg.Metrics.Public,
+		"demo_mode":       s.cfg.DemoMode,
+	}
+
+	if err := s.store.Ping(c.Request.Context()); err != nil {
+		log.Error().Err(err).Msg("system status ping failed")
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "degraded",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
 }
 
 func (s *HTTPServer) respondErr(c *gin.Context, err error) {

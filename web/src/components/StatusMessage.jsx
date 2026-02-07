@@ -1,3 +1,7 @@
+import React from 'react';
+import clsx from 'clsx';
+import { AlertCircle, Inbox } from 'lucide-react';
+
 // Premium "Gold Skeleton" for loading states
 function GoldSkeleton() {
     return (
@@ -11,7 +15,12 @@ function GoldSkeleton() {
 
 export function StatusMessage({ variant = 'info', title, description, onRetry }) {
     if (variant === 'loading') {
-        return <GoldSkeleton />;
+        return (
+            <div className="space-y-3" role="status" aria-live="polite">
+                <GoldSkeleton />
+                {title && <p className="text-xs text-gray-400">{title}</p>}
+            </div>
+        );
     }
 
     const icons = {
