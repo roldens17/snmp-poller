@@ -247,3 +247,51 @@ func (s *HTTPServer) handleListAlertDeliveries(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"deliveries": deliveries})
 }
+
+
+func (s *HTTPServer) handleAPIAlerts(c *gin.Context) {
+	status := strings.TrimSpace(c.Query("status"))
+	if status == "" {
+		status = "active"
+	}
+	if status != "active" && status != "resolved" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status must be active|resolved"})
+		return
+	}
+	limit := 50
+	if l := strings.TrimSpace(c.Query("limit")); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+	tenantID := s.getTenantID(c)
+	items, err := s.store.ListAlertsAPI(c.Request.Context(), tenantID, status, limit)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"alerts": items})
+}
+
+func (s *HTTPServer) handleTenantsOverview(c *gin.Context) {
+	user, ok := s.getAuthUser(c)
+	if !ok || user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	tens, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	ids := make([]string, 0, len(tens))
+	for _, t := range tens {
+		ids = append(ids, t.ID)
+	}
+	rows, err := s.store.TenantOverviewByIDs(c.Request.Context(), ids)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tenants": rows})
+}

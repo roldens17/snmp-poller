@@ -84,6 +84,8 @@ export const api = {
     getDeviceMacs: (id) => fetchWithTimeout(`/devices/${id}/macs`),
     getMacs: () => fetchWithTimeout(`/macs`, { retryOn: [502, 503, 504] }),
     getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`),
+    getAPIAlerts: (status = 'active', limit = 50) => fetchWithTimeout(`/api/alerts?status=${status}&limit=${limit}`),
+    getTenantOverview: () => fetchWithTimeout(`/api/tenants/overview`),
     getDiscovery: () => fetchWithTimeout(`/discovery`),
     getHealth: () => fetchWithTimeout(`/healthz`),
     getSystemStatus: () => fetchWithTimeout(`/system/status`, { suppressGlobalError: true }),

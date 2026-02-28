@@ -11,6 +11,7 @@ import { parseAPITimestamp } from '../utils/time';
 export function Dashboard() {
     const [stats, setStats] = useState({ devices: 0, alerts: 0, up: 0, down: 0 });
     const [alerts, setAlerts] = useState([]);
+    const [tenantOverview, setTenantOverview] = useState([]);
     const [topTalkers, setTopTalkers] = useState([]); // Mocking this for now as backend support isn't explicit
     const [loading, setLoading] = useState(true);
     const [trafficWindow, setTrafficWindow] = useState('5m');
@@ -19,9 +20,10 @@ export function Dashboard() {
     useEffect(() => {
         async function load() {
             try {
-                const [devRes, alertRes, macsRes] = await Promise.allSettled([
+                const [devRes, alertRes, overviewRes, macsRes] = await Promise.allSettled([
                     api.getDevices(),
-                    api.getAlerts(true),
+                    api.getAPIAlerts('active', 20),
+                    api.getTenantOverview(),
                     api.getDeviceMacs(1) // Just fetching some macs to fake traffic data
                 ]);
 
@@ -35,6 +37,7 @@ export function Dashboard() {
                     alerts: alertRes.status === 'fulfilled' ? (alertRes.value.alerts || []).length : 0
                 });
                 setAlerts(alertRes.status === 'fulfilled' ? (alertRes.value.alerts || []) : []);
+                setTenantOverview(overviewRes.status === 'fulfilled' ? (overviewRes.value.tenants || []) : []);
 
                 // Mocking traffic data
                 if (macsRes.status === 'fulfilled') {
@@ -146,6 +149,31 @@ export function Dashboard() {
                 ))}
             </div>
 
+
+            <motion.div variants={itemVariants} className="glass-panel p-6 rounded-2xl">
+                <h2 className="text-lg font-bold mb-4 text-white">Tenant Overview</h2>
+                {tenantOverview.length === 0 ? (
+                    <div className="text-sm text-gray-500">No tenant overview data yet.</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {tenantOverview.map(t => (
+                            <div key={t.tenant_id} className="p-4 rounded-xl border border-white/10 bg-white/5">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm font-semibold text-white">{t.name}</div>
+                                    <span className={clsx('px-2 py-0.5 rounded text-[10px] uppercase border', t.status_color === 'red' ? 'text-red-400 border-red-500/30 bg-red-500/10' : t.status_color === 'yellow' ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-green-400 border-green-500/30 bg-green-500/10')}>{t.status_color}</span>
+                                </div>
+                                <div className="mt-2 text-xs text-gray-400 space-y-1">
+                                    <div>devices_down: <span className="text-white">{t.devices_down}</span></div>
+                                    <div>active_alerts: <span className="text-white">{t.active_alerts}</span></div>
+                                    <div>last_poll_at: <span className="text-white">{t.last_poll_at ? formatDistanceToNow(parseAPITimestamp(t.last_poll_at), { addSuffix: true }) : 'n/a'}</span></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </motion.div>
+
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Top Talkers */}
                 <motion.div variants={itemVariants} className="lg:col-span-2 glass-panel p-8 rounded-2xl">
@@ -253,13 +281,13 @@ export function Dashboard() {
                                         </span>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-bold text-gray-200 group-hover:text-gold transition truncate">
-                                                {alert.category}
+                                                {alert.title || alert.alert_type}
                                             </p>
                                             <p className="text-xs text-gray-400 mt-0.5 flex items-center">
                                                 <Server className="w-3 h-3 mr-1" />
                                                 Device #{alert.device_id}
                                             </p>
-                                            <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{alert.message}</p>
+                                            <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{alert.details ? (typeof alert.details === "string" ? alert.details : JSON.stringify(alert.details)) : ""}</p>
                                         </div>
                                     </div>
                                     <div className="mt-3 flex justify-end">

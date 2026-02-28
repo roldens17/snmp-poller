@@ -12,7 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 
-	"github.com/fresatu/snmp-poller/internal/config"
+	"github.com/fresatu/snmp-poller/internal/alerts"
+"github.com/fresatu/snmp-poller/internal/config"
 	"github.com/fresatu/snmp-poller/internal/devicereg"
 	"github.com/fresatu/snmp-poller/internal/notification"
 	"github.com/fresatu/snmp-poller/internal/security"
@@ -328,6 +329,14 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 	}
 	s.clearDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down")
 	s.evaluateAlerts(ctx, s.defaultTenantID, deviceID, pollTime, ifaces, prevStates, prevCounters)
+	_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
+		TenantID:   s.defaultTenantID,
+		DeviceID:   fmt.Sprintf("%d", deviceID),
+		DeviceName: sw.Name,
+		DeviceIP:   sw.Address,
+		Success:    true,
+		PolledAt:   pollTime,
+	})
 	return nil
 }
 
@@ -360,6 +369,15 @@ func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollE
 		s.raiseDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down", "critical", msg)
 	}
 	if deviceID > 0 {
+		_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
+			TenantID:   s.defaultTenantID,
+			DeviceID:   fmt.Sprintf("%d", deviceID),
+			DeviceName: sw.Name,
+			DeviceIP:   normalizeHost(sw.Address),
+			Success:    false,
+			Err:        pollErr.Error(),
+			PolledAt:   time.Now().UTC(),
+		})
 		if err := s.store.UpdateDeviceStatus(ctx, s.defaultTenantID, deviceID, "error", nil); err != nil {
 			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to update device status")
 		}
