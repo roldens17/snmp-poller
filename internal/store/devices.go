@@ -242,3 +242,11 @@ func (s *Store) DeleteDevice(ctx context.Context, tenantID string, id int64) err
 	}
 	return nil
 }
+
+
+// CountDevices returns number of devices in a tenant.
+func (s *Store) CountDevices(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM devices WHERE tenant_id=$1`, tenantID).Scan(&n)
+	return n, err
+}

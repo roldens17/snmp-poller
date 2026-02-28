@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -53,6 +54,18 @@ func (s *HTTPServer) handleCreateDevice(c *gin.Context) {
 		return
 	}
 	tenantID := s.getTenantID(c)
+	if tenant, ok := s.getAuthTenant(c); ok && tenant != nil && tenant.MaxDevices > 0 {
+		count, err := s.store.CountDevices(c.Request.Context(), tenantID)
+		if err == nil && count >= tenant.MaxDevices {
+			c.JSON(http.StatusPaymentRequired, gin.H{
+				"error": "plan device limit reached",
+				"code": "PLAN_LIMIT_DEVICES",
+				"max_devices": tenant.MaxDevices,
+				"device_count": count,
+			})
+			return
+		}
+	}
 	device, err := s.deviceReg.CreateDevice(c.Request.Context(), tenantID, req)
 	if err != nil {
 		var existsErr *devicereg.DeviceExistsError
@@ -77,5 +90,6 @@ func (s *HTTPServer) handleCreateDevice(c *gin.Context) {
 		s.respondErr(c, err)
 		return
 	}
+	s.addAudit(c, "device.create", "device", fmt.Sprintf("%d", device.ID), fmt.Sprintf(`{"hostname":%q,"mgmt_ip":%q}`, device.Hostname, device.MgmtIP))
 	c.JSON(http.StatusCreated, device)
 }

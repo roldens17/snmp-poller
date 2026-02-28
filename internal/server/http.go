@@ -162,6 +162,13 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/tenants", s.handleListTenants)
 	protected.GET("/tenants/active", s.handleGetActiveTenant)
 	protected.POST("/tenants/active", s.handleSwitchTenant)
+	protected.GET("/tenants/invites", s.handleListInvites)
+	protected.POST("/tenants/invites", s.handleCreateInvite)
+	protected.DELETE("/tenants/invites/:id", s.handleDeleteInvite)
+	protected.POST("/tenants/invites/accept", s.handleAcceptInvite)
+	protected.GET("/audit/events", s.handleListAudit)
+	protected.GET("/billing/plan", s.handleGetPlan)
+	protected.PATCH("/billing/plan", s.handleUpdatePlan)
 
 	log.Info().Bool("demo_mode", s.cfg.DemoMode).Msg("server config")
 
@@ -289,6 +296,7 @@ func (s *HTTPServer) handleDeleteDevice(c *gin.Context) {
 		s.respondErr(c, err)
 		return
 	}
+	s.addAudit(c, "device.delete", "device", c.Param("id"), "{}")
 	c.Status(http.StatusNoContent)
 }
 

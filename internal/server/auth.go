@@ -212,6 +212,8 @@ func (s *HTTPServer) handleAuthLogin(c *gin.Context) {
 	}
 
 	s.setAuthCookie(c, token, int(s.auth.TokenTTL().Seconds()))
+	tenantID := initialTenantID
+	_ = s.store.AddAuditEvent(c.Request.Context(), tenantID, user.ID, "auth.login", "session", "", `{}`, c.ClientIP())
 	c.JSON(http.StatusOK, gin.H{"ok": true, "user": toAuthUserResponse(user)})
 }
 
@@ -342,5 +344,6 @@ func (s *HTTPServer) handleSwitchTenant(c *gin.Context) {
 	}
 
 	s.setAuthCookie(c, token, int(s.auth.TokenTTL().Seconds()))
+	_ = s.store.AddAuditEvent(c.Request.Context(), targetTenant.ID, user.ID, "tenant.switch", "tenant", targetTenant.ID, `{}`, c.ClientIP())
 	c.JSON(http.StatusOK, gin.H{"tenant": targetTenant})
 }

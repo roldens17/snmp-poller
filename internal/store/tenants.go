@@ -9,8 +9,8 @@ func (s *Store) CreateTenant(ctx context.Context, name, slug string) (*Tenant, e
 	var t Tenant
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO tenants (name, slug) VALUES ($1, $2)
-		RETURNING id, name, slug, created_at, updated_at
-	`, name, slug).Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.UpdatedAt)
+		RETURNING id, name, slug, plan_code, max_devices, billing_status, trial_ends_at, created_at, updated_at
+	`, name, slug).Scan(&t.ID, &t.Name, &t.Slug, &t.PlanCode, &t.MaxDevices, &t.BillingStatus, &t.TrialEndsAt, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -21,8 +21,8 @@ func (s *Store) CreateTenant(ctx context.Context, name, slug string) (*Tenant, e
 func (s *Store) GetTenantByID(ctx context.Context, id string) (*Tenant, error) {
 	var t Tenant
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, name, slug, created_at, updated_at FROM tenants WHERE id = $1
-	`, id).Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.UpdatedAt)
+		SELECT id, name, slug, plan_code, max_devices, billing_status, trial_ends_at, created_at, updated_at FROM tenants WHERE id = $1
+	`, id).Scan(&t.ID, &t.Name, &t.Slug, &t.PlanCode, &t.MaxDevices, &t.BillingStatus, &t.TrialEndsAt, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (s *Store) GetTenantByID(ctx context.Context, id string) (*Tenant, error) {
 // GetUserTenants returns the list of tenants a user belongs to.
 func (s *Store) GetUserTenants(ctx context.Context, userID string) ([]Tenant, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT t.id, t.name, t.slug, t.created_at, t.updated_at
+		SELECT t.id, t.name, t.slug, t.plan_code, t.max_devices, t.billing_status, t.trial_ends_at, t.created_at, t.updated_at
 		FROM tenants t
 		JOIN user_tenants ut ON t.id = ut.tenant_id
 		WHERE ut.user_id = $1
@@ -46,7 +46,7 @@ func (s *Store) GetUserTenants(ctx context.Context, userID string) ([]Tenant, er
 	var tenants []Tenant
 	for rows.Next() {
 		var t Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Slug, &t.PlanCode, &t.MaxDevices, &t.BillingStatus, &t.TrialEndsAt, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		tenants = append(tenants, t)
@@ -58,8 +58,8 @@ func (s *Store) GetUserTenants(ctx context.Context, userID string) ([]Tenant, er
 func (s *Store) GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error) {
 	var t Tenant
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, name, slug, created_at, updated_at FROM tenants WHERE slug = $1
-	`, slug).Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.UpdatedAt)
+		SELECT id, name, slug, plan_code, max_devices, billing_status, trial_ends_at, created_at, updated_at FROM tenants WHERE slug = $1
+	`, slug).Scan(&t.ID, &t.Name, &t.Slug, &t.PlanCode, &t.MaxDevices, &t.BillingStatus, &t.TrialEndsAt, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -97,5 +97,12 @@ func (s *Store) AddUserToTenant(ctx context.Context, userID, tenantID, role stri
 		VALUES ($1, $2, $3)
 		ON CONFLICT (user_id, tenant_id) DO UPDATE SET role = EXCLUDED.role, created_at = now()
 	`, userID, tenantID, role)
+	return err
+}
+
+
+// UpdateTenantPlan updates billing/plan limits for a tenant.
+func (s *Store) UpdateTenantPlan(ctx context.Context, tenantID, planCode, billingStatus string, maxDevices int) error {
+	_, err := s.pool.Exec(ctx, `UPDATE tenants SET plan_code=$1, billing_status=$2, max_devices=$3, updated_at=now() WHERE id=$4`, planCode, billingStatus, maxDevices, tenantID)
 	return err
 }

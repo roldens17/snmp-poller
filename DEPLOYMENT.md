@@ -142,3 +142,35 @@ openssl rand -base64 48   # AUTH_JWT_SECRET
 openssl rand -base64 32   # ENCRYPTION_KEY
 openssl rand -base64 24   # POSTGRES_PASSWORD
 ```
+
+## Phase 2.5–3.5 Controls Added
+
+### New security/ops env vars
+- `AUTH_LOGIN_RATE_PER_MIN` (default: `20`)
+- `AUTH_LOGIN_BURST` (default: `10`)
+- `AUTH_COOKIE_HTTP_ONLY`
+- `AUTH_COOKIE_SAME_SITE`
+- `AUTH_COOKIE_DOMAIN`
+
+### New endpoints (authenticated)
+- `GET /billing/plan`
+- `PATCH /billing/plan` (plan/billing/devices limit)
+- `GET /audit/events?limit=100`
+- `GET /tenants/invites`
+- `POST /tenants/invites`
+- `DELETE /tenants/invites/:id`
+- `POST /tenants/invites/accept`
+
+### Device plan limit enforcement
+`POST /api/devices` and `POST /devices` now return:
+- `402 Payment Required` + `code=PLAN_LIMIT_DEVICES` when tenant reaches `max_devices`.
+
+### Ops scripts
+- Backup: `ops/backup/pg_backup.sh`
+- Restore latest: `ops/backup/restore_latest.sh`
+- Create owner + tenant: `ops/onboarding/create_owner.sh`
+- Smoke checks: `ops/sre/smoke.sh`
+
+### Production compose
+- `compose.prod.yaml` + `.env.production.example`
+- Nginx template: `ops/nginx/snmp-saas.conf.example`

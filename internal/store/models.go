@@ -4,11 +4,15 @@ import "time"
 
 // Tenant represents a tenant organization.
 type Tenant struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	Slug          string     `json:"slug"`
+	PlanCode      string     `json:"plan_code"`
+	MaxDevices    int        `json:"max_devices"`
+	BillingStatus string     `json:"billing_status"`
+	TrialEndsAt   *time.Time `json:"trial_ends_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // UserTenant represents the many-to-many relationship.
@@ -144,4 +148,31 @@ type AlertDestination struct {
 	IsEnabled bool      `json:"is_enabled"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+
+// TenantInvite is a pending invitation to join a tenant.
+type TenantInvite struct {
+	ID         string     `json:"id"`
+	TenantID   string     `json:"tenant_id"`
+	Email      string     `json:"email"`
+	Role       string     `json:"role"`
+	Token      string     `json:"token,omitempty"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
+	CreatedBy  string     `json:"created_by,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// AuditEvent records security-sensitive actions.
+type AuditEvent struct {
+	ID         int64     `json:"id"`
+	TenantID   string    `json:"tenant_id,omitempty"`
+	UserID     string    `json:"user_id,omitempty"`
+	Action     string    `json:"action"`
+	Resource   string    `json:"resource"`
+	ResourceID string    `json:"resource_id,omitempty"`
+	Metadata   string    `json:"metadata"`
+	IP         string    `json:"ip,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
