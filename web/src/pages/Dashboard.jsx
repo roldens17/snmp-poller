@@ -12,6 +12,9 @@ export function Dashboard() {
     const [stats, setStats] = useState({ devices: 0, alerts: 0, up: 0, down: 0 });
     const [alerts, setAlerts] = useState([]);
     const [tenantOverview, setTenantOverview] = useState([]);
+    const [selectedTenantId, setSelectedTenantId] = useState('');
+    const [tenantDetails, setTenantDetails] = useState({ devices_down: [], active_alerts: [] });
+    const [tenantDetailsLoading, setTenantDetailsLoading] = useState(false);
     const [topTalkers, setTopTalkers] = useState([]); // Mocking this for now as backend support isn't explicit
     const [loading, setLoading] = useState(true);
     const [trafficWindow, setTrafficWindow] = useState('5m');
@@ -83,6 +86,29 @@ export function Dashboard() {
     const handleTopTalkerClick = (talker) => {
         if (!talker.deviceId) return;
         navigate(`/devices/${talker.deviceId}`);
+    };
+
+    const handleTenantSelect = async (tenantId) => {
+        if (!tenantId) return;
+        if (selectedTenantId === tenantId) {
+            setSelectedTenantId('');
+            setTenantDetails({ devices_down: [], active_alerts: [] });
+            return;
+        }
+        setSelectedTenantId(tenantId);
+        setTenantDetailsLoading(true);
+        try {
+            const details = await api.getTenantOverviewDetails(tenantId);
+            setTenantDetails({
+                devices_down: details.devices_down || [],
+                active_alerts: details.active_alerts || [],
+            });
+        } catch (err) {
+            console.error('failed tenant details', err);
+            setTenantDetails({ devices_down: [], active_alerts: [] });
+        } finally {
+            setTenantDetailsLoading(false);
+        }
     };
 
     if (loading) {
@@ -157,7 +183,7 @@ export function Dashboard() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tenantOverview.map(t => (
-                            <div key={t.tenant_id} className="p-4 rounded-xl border border-white/10 bg-white/5">
+                            <button key={t.tenant_id} onClick={() => handleTenantSelect(t.tenant_id)} className={clsx("p-4 rounded-xl border bg-white/5 text-left transition", selectedTenantId === t.tenant_id ? "border-gold/40" : "border-white/10 hover:border-gold/20")}>
                                 <div className="flex items-center justify-between">
                                     <div className="text-sm font-semibold text-white">{t.name}</div>
                                     <span className={clsx('px-2 py-0.5 rounded text-[10px] uppercase border', t.status_color === 'red' ? 'text-red-400 border-red-500/30 bg-red-500/10' : t.status_color === 'yellow' ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-green-400 border-green-500/30 bg-green-500/10')}>{t.status_color}</span>
@@ -167,8 +193,49 @@ export function Dashboard() {
                                     <div>active_alerts: <span className="text-white">{t.active_alerts}</span></div>
                                     <div>last_poll_at: <span className="text-white">{t.last_poll_at ? formatDistanceToNow(parseAPITimestamp(t.last_poll_at), { addSuffix: true }) : 'n/a'}</span></div>
                                 </div>
-                            </div>
+                            </button>
                         ))}
+                    </div>
+                )}
+
+                {selectedTenantId && (
+                    <div className="mt-4 p-4 rounded-xl border border-gold/20 bg-black/20">
+                        <div className="text-sm font-semibold text-gold mb-3">Tenant details</div>
+                        {tenantDetailsLoading ? (
+                            <div className="text-xs text-gray-400">Loading tenant details...</div>
+                        ) : (
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <div className="text-xs uppercase text-gray-500 mb-2">Devices Down</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {tenantDetails.devices_down.length === 0 ? (
+                                            <div className="text-xs text-gray-500">No devices down</div>
+                                        ) : tenantDetails.devices_down.map(d => (
+                                            <div key={d.device_id} className="p-2 rounded border border-white/10 bg-white/5 text-xs">
+                                                <div className="text-white font-medium">{d.device_name || `Device #${d.device_id}`}</div>
+                                                <div className="text-gray-400">{d.device_ip || 'n/a'}</div>
+                                                <div className="text-gray-500">down since: {d.down_since ? formatDistanceToNow(parseAPITimestamp(d.down_since), { addSuffix: true }) : 'n/a'}</div>
+                                                <div className="text-gray-500">last success: {d.last_success_at ? formatDistanceToNow(parseAPITimestamp(d.last_success_at), { addSuffix: true }) : 'n/a'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-xs uppercase text-gray-500 mb-2">Active DEVICE_DOWN Alerts</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {tenantDetails.active_alerts.length === 0 ? (
+                                            <div className="text-xs text-gray-500">No active alerts</div>
+                                        ) : tenantDetails.active_alerts.map(a => (
+                                            <div key={a.id} className="p-2 rounded border border-red-500/20 bg-red-500/5 text-xs">
+                                                <div className="text-red-300 font-medium">{a.title || 'Device unreachable'}</div>
+                                                <div className="text-gray-300">{a.device_name || `Device #${a.device_id}`} • {a.device_ip || 'n/a'}</div>
+                                                <div className="text-gray-500">down since: {a.triggered_at ? formatDistanceToNow(parseAPITimestamp(a.triggered_at), { addSuffix: true }) : 'n/a'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </motion.div>

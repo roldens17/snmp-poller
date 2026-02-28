@@ -192,6 +192,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	api.DELETE("/devices/:id", s.handleDeleteDevice)
 	api.GET("/alerts", s.handleAPIAlerts)
 	api.GET("/tenants/overview", s.handleTenantsOverview)
+	api.GET("/tenants/:id/overview-details", s.handleTenantOverviewDetails)
 	protected.GET("/macs", s.handleListMacs)
 	protected.GET("/alert-destinations", s.handleListAlertDestinations)
 	protected.POST("/alert-destinations", s.handleCreateAlertDestination)

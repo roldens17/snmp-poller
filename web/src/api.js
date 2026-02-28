@@ -86,6 +86,7 @@ export const api = {
     getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`),
     getAPIAlerts: (status = 'active', limit = 50) => fetchWithTimeout(`/api/alerts?status=${status}&limit=${limit}`),
     getTenantOverview: () => fetchWithTimeout(`/api/tenants/overview`),
+    getTenantOverviewDetails: (tenantId) => fetchWithTimeout(`/api/tenants/${tenantId}/overview-details`),
     getDiscovery: () => fetchWithTimeout(`/discovery`),
     getHealth: () => fetchWithTimeout(`/healthz`),
     getSystemStatus: () => fetchWithTimeout(`/system/status`, { suppressGlobalError: true }),

@@ -295,3 +295,44 @@ func (s *HTTPServer) handleTenantsOverview(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"tenants": rows})
 }
+
+
+func (s *HTTPServer) handleTenantOverviewDetails(c *gin.Context) {
+	user, ok := s.getAuthUser(c)
+	if !ok || user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	tenantID := strings.TrimSpace(c.Param("id"))
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant id required"})
+		return
+	}
+	tens, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	allowed := false
+	for _, t := range tens {
+		if t.ID == tenantID {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	down, activeAlerts, err := s.store.TenantOverviewDetails(c.Request.Context(), tenantID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"tenant_id":     tenantID,
+		"devices_down":  down,
+		"active_alerts": activeAlerts,
+	})
+}
