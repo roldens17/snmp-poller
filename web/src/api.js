@@ -91,6 +91,7 @@ export const api = {
     getHealth: () => fetchWithTimeout(`/healthz`),
     getSystemStatus: () => fetchWithTimeout(`/system/status`, { suppressGlobalError: true }),
     login: (email, password) => postJson(`/auth/login`, { email, password }),
+    registerInvite: (token, password, name='') => postJson(`/auth/register-invite`, { token, password, name }),
     logout: () => postJson(`/auth/logout`, {}),
     me: () => fetchWithTimeout(`/auth/me`, { suppressGlobalError: true }),
     getTenants: () => fetchWithTimeout(`/tenants`),

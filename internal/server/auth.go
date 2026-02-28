@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -285,6 +286,83 @@ func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user)})
+}
+
+
+func (s *HTTPServer) handleAuthRegisterInvite(c *gin.Context) {
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	req.Token = strings.TrimSpace(req.Token)
+	if req.Token == "" || strings.TrimSpace(req.Password) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token and password required"})
+		return
+	}
+
+	inv, err := s.store.GetInviteByToken(c.Request.Context(), req.Token)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
+			return
+		}
+		s.respondErr(c, err)
+		return
+	}
+	if inv.AcceptedAt != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "invite already used"})
+		return
+	}
+	if time.Now().After(inv.ExpiresAt) {
+		c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(inv.Email))
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invite missing email"})
+		return
+	}
+	if _, err := s.store.GetUserByEmail(c.Request.Context(), email); err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "account already exists; login then accept invite"})
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		s.respondErr(c, err)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	user, err := s.store.CreateUser(c.Request.Context(), email, hash, req.Name, inv.Role)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	if err := s.store.AddUserToTenant(c.Request.Context(), user.ID, inv.TenantID, inv.Role); err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	if err := s.store.MarkInviteAccepted(c.Request.Context(), inv.ID); err != nil {
+		s.respondErr(c, err)
+		return
+	}
+
+	token, err := s.auth.CreateJWT(user.ID, user.Email, user.Role, inv.TenantID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	s.setAuthCookie(c, token, int(s.auth.TokenTTL().Seconds()))
+	_ = s.store.AddAuditEvent(c.Request.Context(), inv.TenantID, user.ID, "invite.accept", "tenant_invite", inv.ID, `{}`, c.ClientIP())
+	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user), "tenant_id": inv.TenantID})
 }
 
 func (s *HTTPServer) handleGetActiveTenant(c *gin.Context) {

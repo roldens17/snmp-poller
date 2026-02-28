@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Login } from './pages/Login';
+import { AcceptInvite } from './pages/AcceptInvite';
 import { ToastProvider } from './components/ToastProvider';
 import { ConfirmProvider } from './components/ConfirmProvider';
 
@@ -45,6 +46,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route
             path="/*"
             element={

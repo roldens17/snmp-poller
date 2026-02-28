@@ -155,6 +155,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	engine.POST("/auth/logout", s.handleAuthLogout)
 	engine.GET("/auth/me", s.authRequired(), s.handleAuthMe)
 	engine.POST("/auth/register", s.handleAuthRegister)
+	engine.POST("/auth/register-invite", s.handleAuthRegisterInvite)
 
 	protected := engine.Group("/")
 	protected.Use(s.authRequired())
