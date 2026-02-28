@@ -97,6 +97,7 @@ type HTTPConfig struct {
 	EnableDebug      bool     `yaml:"debug"`
 	AllowedOrigins   []string `yaml:"allowed_origins"`
 	DashboardBaseURL string   `yaml:"dashboard_base_url"`
+	TrustedProxies   []string `yaml:"trusted_proxies"`
 }
 
 // AuthConfig defines authentication settings.
@@ -217,6 +218,12 @@ func (c *Config) Validate() error {
 	if c.Auth.JWTSecret == "" {
 		return errors.New("auth.jwt_secret is required (set AUTH_JWT_SECRET or configure auth.jwt_secret)")
 	}
+	if strings.EqualFold(os.Getenv("ENV"), "production") {
+		lower := strings.ToLower(strings.TrimSpace(c.Auth.JWTSecret))
+		if strings.Contains(lower, "replace_me") || strings.Contains(lower, "change_me") || len(lower) < 24 {
+			return errors.New("placeholder JWT secret is not allowed in production")
+		}
+	}
 
 	return nil
 }
@@ -242,6 +249,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.HTTP.DashboardBaseURL == "" {
 		c.HTTP.DashboardBaseURL = "http://localhost:3000"
+	}
+	if len(c.HTTP.TrustedProxies) == 0 {
+		c.HTTP.TrustedProxies = []string{"127.0.0.1", "::1", "172.16.0.0/12", "10.0.0.0/8", "192.168.0.0/16"}
 	}
 	if c.Postgres.MaxConns == 0 {
 		c.Postgres.MaxConns = 8
@@ -349,6 +359,16 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := os.Getenv("HTTP_ADDR"); v != "" {
 		c.HTTP.Addr = v
+	}
+	if v := strings.TrimSpace(os.Getenv("HTTP_TRUSTED_PROXIES")); v != "" {
+		parts := strings.Split(v, ",")
+		c.HTTP.TrustedProxies = c.HTTP.TrustedProxies[:0]
+		for _, p := range parts {
+			pp := strings.TrimSpace(p)
+			if pp != "" {
+				c.HTTP.TrustedProxies = append(c.HTTP.TrustedProxies, pp)
+			}
+		}
 	}
 	if v := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); v != "" {
 		origins := strings.Split(v, ",")

@@ -70,6 +70,9 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
+	if err := engine.SetTrustedProxies(s.cfg.HTTP.TrustedProxies); err != nil {
+		log.Warn().Err(err).Msg("failed to set trusted proxies; using default gin behavior")
+	}
 	engine.Use(gin.Recovery())
 	engine.Use(func(c *gin.Context) {
 		h := c.Writer.Header()

@@ -1,6 +1,5 @@
 const envApiBase = import.meta.env.VITE_API_BASE_URL;
-const fallbackApiBase = `${window.location.protocol}//${window.location.hostname}:8081`;
-const API_BASE = (envApiBase || fallbackApiBase).replace(/\/$/, "");
+const API_BASE = (envApiBase ?? '/api').replace(/\/$/, "");
 
 async function fetchWithTimeout(path, options = {}) {
     const { timeout = 5000, retryOn = [], suppressGlobalError = false } = options;
@@ -29,17 +28,12 @@ async function fetchWithTimeout(path, options = {}) {
 
         if (!response.ok) {
             if (retryOn.includes(response.status)) {
-                // retry once for transient status codes
                 return fetchWithTimeout(path, { ...options, retryOn: [], timeout });
             }
             const contentType = response.headers.get("content-type") || "";
             let body = null;
             try {
-                if (contentType.includes("application/json")) {
-                    body = await response.json();
-                } else {
-                    body = await response.text();
-                }
+                body = contentType.includes("application/json") ? await response.json() : await response.text();
             } catch {
                 body = null;
             }
@@ -60,10 +54,7 @@ async function fetchWithTimeout(path, options = {}) {
         }
 
         const contentType = response.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-            return response.json();
-        }
-        return response.text();
+        return contentType.includes("application/json") ? response.json() : response.text();
     } finally {
         clearTimeout(id);
     }
