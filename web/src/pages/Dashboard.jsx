@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { AlertCircle, Server, ToggleRight, GitMerge, Bug, Octagon, ArrowRight, BarChart2 } from 'lucide-react';
+import { AlertCircle, Server, ToggleRight, GitMerge, Bug, Octagon, ArrowRight, BarChart2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { getDeviceStatusInfo } from '../utils/deviceStatus';
@@ -15,6 +15,8 @@ export function Dashboard() {
     const [selectedTenantId, setSelectedTenantId] = useState('');
     const [tenantDetails, setTenantDetails] = useState({ devices_down: [], active_alerts: [] });
     const [tenantDetailsLoading, setTenantDetailsLoading] = useState(false);
+    const [webhookCount, setWebhookCount] = useState(0);
+    const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('onboardingDismissed') === '1');
     const [topTalkers, setTopTalkers] = useState([]); // Mocking this for now as backend support isn't explicit
     const [loading, setLoading] = useState(true);
     const [trafficWindow, setTrafficWindow] = useState('5m');
@@ -23,11 +25,12 @@ export function Dashboard() {
     useEffect(() => {
         async function load() {
             try {
-                const [devRes, alertRes, overviewRes, macsRes] = await Promise.allSettled([
+                const [devRes, alertRes, overviewRes, macsRes, destRes] = await Promise.allSettled([
                     api.getDevices(),
                     api.getAPIAlerts('active', 20),
                     api.getTenantOverview(),
-                    api.getDeviceMacs(1) // Just fetching some macs to fake traffic data
+                    api.getDeviceMacs(1),
+                    api.getAlertDestinations()
                 ]);
 
                 const devs = devRes.status === 'fulfilled' ? (devRes.value.devices || []) : [];
@@ -41,6 +44,7 @@ export function Dashboard() {
                 });
                 setAlerts(alertRes.status === 'fulfilled' ? (alertRes.value.alerts || []) : []);
                 setTenantOverview(overviewRes.status === 'fulfilled' ? (overviewRes.value.tenants || []) : []);
+                setWebhookCount(destRes.status === 'fulfilled' ? ((destRes.value.destinations || []).filter(d => d.is_enabled).length) : 0);
 
                 // Mocking traffic data
                 if (macsRes.status === 'fulfilled') {
@@ -124,6 +128,20 @@ export function Dashboard() {
         return () => clearInterval(id);
     }, [selectedTenantId]);
 
+
+    const onboarding = {
+        hasDevices: stats.devices > 0,
+        hasAlertsDestination: webhookCount > 0,
+        viewedAlerts: alerts.length >= 0,
+    };
+    const completedSteps = [onboarding.hasDevices, onboarding.hasAlertsDestination].filter(Boolean).length;
+    const showOnboarding = !onboardingDismissed && completedSteps < 2;
+
+    const dismissOnboarding = () => {
+        setOnboardingDismissed(true);
+        localStorage.setItem('onboardingDismissed', '1');
+    };
+
     if (loading) {
         return (
             <div className="text-center text-gold animate-pulse text-xl font-bold flex flex-col justify-center items-center h-full tracking-widest uppercase space-y-3">
@@ -188,6 +206,33 @@ export function Dashboard() {
                 ))}
             </div>
 
+            {showOnboarding && (
+                <motion.div variants={itemVariants} className="glass-panel p-6 rounded-2xl border border-gold/20">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-2 text-white font-semibold">
+                            <Sparkles className="w-5 h-5 text-gold" />
+                            Quick onboarding ({completedSteps}/2)
+                        </div>
+                        <button onClick={dismissOnboarding} className="text-xs text-gray-400 hover:text-white">Dismiss</button>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3 text-sm">
+                        <div className="p-3 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className={`w-4 h-4 ${onboarding.hasDevices ? 'text-green-400' : 'text-gray-500'}`} />
+                                <span>Add your first device</span>
+                            </div>
+                            {!onboarding.hasDevices && <Link className="text-gold" to="/devices/new">Go</Link>}
+                        </div>
+                        <div className="p-3 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className={`w-4 h-4 ${onboarding.hasAlertsDestination ? 'text-green-400' : 'text-gray-500'}`} />
+                                <span>Configure alert webhook</span>
+                            </div>
+                            {!onboarding.hasAlertsDestination && <Link className="text-gold" to="/settings?tab=alerts">Go</Link>}
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
             <motion.div variants={itemVariants} className="glass-panel p-6 rounded-2xl">
                 <h2 className="text-lg font-bold mb-4 text-white">Tenant Overview</h2>
