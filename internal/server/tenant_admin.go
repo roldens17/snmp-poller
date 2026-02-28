@@ -230,3 +230,20 @@ func (s *HTTPServer) handleUpdatePlan(c *gin.Context) {
 	s.addAudit(c, "plan.update", "tenant", tenant, fmt.Sprintf(`{"plan_code":%q,"billing_status":%q,"max_devices":%d}`, req.PlanCode, req.BillingStatus, req.MaxDevices))
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
+
+
+func (s *HTTPServer) handleListAlertDeliveries(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	limit := 100
+	if l := strings.TrimSpace(c.Query("limit")); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+	deliveries, err := s.store.ListAlertDeliveries(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deliveries": deliveries})
+}

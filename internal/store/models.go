@@ -176,3 +176,19 @@ type AuditEvent struct {
 	IP         string    `json:"ip,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 }
+
+
+// AlertDelivery tracks webhook delivery attempts for alerts.
+type AlertDelivery struct {
+	ID            int64     `json:"id"`
+	TenantID      string    `json:"tenant_id"`
+	DestinationID string    `json:"destination_id"`
+	AlertID       int64     `json:"alert_id"`
+	Event         string    `json:"event"`
+	Attempt       int       `json:"attempt"`
+	StatusCode    *int      `json:"status_code,omitempty"`
+	Success       bool      `json:"success"`
+	DurationMs    int       `json:"duration_ms"`
+	Error         string    `json:"error,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}

@@ -174,3 +174,15 @@ openssl rand -base64 24   # POSTGRES_PASSWORD
 ### Production compose
 - `compose.prod.yaml` + `.env.production.example`
 - Nginx template: `ops/nginx/snmp-saas.conf.example`
+
+## Alert Delivery Reliability (implemented)
+
+- Delivery attempts are now persisted in `alert_deliveries`.
+- Webhook sender uses exponential backoff retries (up to 5 attempts).
+- Each attempt records: destination, alert, event, status code, latency, success/failure, error text.
+- New endpoint: `GET /alerts/deliveries?limit=100` (authenticated, tenant scoped).
+
+Quick verify:
+```bash
+curl -b cookies.txt http://localhost:8081/alerts/deliveries?limit=20
+```

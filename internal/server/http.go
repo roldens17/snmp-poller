@@ -197,6 +197,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.DELETE("/alert-destinations/:id", s.handleDeleteAlertDestination)
 
 	protected.GET("/alerts", s.handleListAlerts)
+	protected.GET("/alerts/deliveries", s.handleListAlertDeliveries)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
 			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
