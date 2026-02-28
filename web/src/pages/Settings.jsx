@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Trash2, Plus, Bell, Settings as SettingsIcon, Save, X, Shield, CreditCard, Send, FileClock, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { useToast } from '../components/ToastProvider';
 
 function Badge({ children, tone = 'gray' }) {
   const tones = {
@@ -15,24 +16,11 @@ function Badge({ children, tone = 'gray' }) {
   return <span className={`px-2 py-1 rounded-lg text-xs border ${tones[tone]}`}>{children}</span>;
 }
 
-function Toast({ toast, onClose }) {
-  if (!toast) return null;
-  const tone = toast.type === 'error' ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-green-500/40 bg-green-500/10 text-green-300';
-  return (
-    <div className={`fixed right-4 top-4 z-50 px-4 py-3 rounded-xl border shadow-xl ${tone}`}>
-      <div className="flex items-center gap-3">
-        <span className="text-sm">{toast.message}</span>
-        <button onClick={onClose} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
-      </div>
-    </div>
-  );
-}
-
 export function Settings() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('billing');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [toast, setToast] = useState(null);
 
   const [dests, setDests] = useState([]);
   const [showWebhookForm, setShowWebhookForm] = useState(false);
@@ -58,8 +46,9 @@ export function Settings() {
   });
 
   const notify = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2800);
+    if (type === 'error') toast.error(message);
+    else if (type === 'info') toast.info(message);
+    else toast.success(message);
   };
 
   const deliveryStats = useMemo(() => {
@@ -205,8 +194,6 @@ export function Settings() {
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6 max-w-6xl mx-auto">
-      <Toast toast={toast} onClose={() => setToast(null)} />
-
       <div className="flex items-center gap-3 mb-2">
         <div className="p-2 rounded-xl bg-gradient-to-br from-gold/20 to-transparent border border-gold/10">
           <SettingsIcon className="w-6 h-6 text-gold" />

@@ -3,6 +3,7 @@ import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, 
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { api } from '../api';
+import { useToast } from './ToastProvider';
 
 export function Layout({ children, user, onLogout }) {
     const location = useLocation();
@@ -12,6 +13,7 @@ export function Layout({ children, user, onLogout }) {
     const [loadingTenants, setLoadingTenants] = useState(false);
     const [systemStatus, setSystemStatus] = useState({ state: 'checking', error: '', updatedAt: null });
     const [alertCount, setAlertCount] = useState(0);
+    const toast = useToast();
 
     // Fetch tenants on mount
     useEffect(() => {
@@ -88,7 +90,7 @@ export function Layout({ children, user, onLogout }) {
             window.location.reload();
         } catch (err) {
             console.error("Failed to switch tenant", err);
-            alert("Failed to switch tenant");
+            toast.error("Failed to switch tenant")
         }
     };
 
@@ -267,9 +269,9 @@ export function Layout({ children, user, onLogout }) {
                                 if (confirm("Seed demo data?")) {
                                     try {
                                         const res = await api.seedDemo();
-                                        alert(`Seeded: ${JSON.stringify(res.stats)}`);
+                                        toast.success(`Demo seeded: ${JSON.stringify(res.stats)}`)
                                         window.location.reload();
-                                    } catch (e) { alert("Failed to seed: " + e.message); }
+                                    } catch (e) { toast.error("Failed to seed: " + e.message); }
                                 }
                             }} className="px-3 py-1 bg-gold/10 hover:bg-gold/20 text-gold text-xs rounded border border-gold/20 transition">
                                 Seed Demo
@@ -278,9 +280,9 @@ export function Layout({ children, user, onLogout }) {
                                 if (confirm("Reset demo data?")) {
                                     try {
                                         await api.resetDemo();
-                                        alert("Demo data reset.");
+                                        toast.success("Demo data reset")
                                         window.location.reload();
-                                    } catch (e) { alert("Failed to reset: " + e.message); }
+                                    } catch (e) { toast.error("Failed to reset: " + e.message); }
                                 }
                             }} className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs rounded border border-red-500/20 transition">
                                 Reset

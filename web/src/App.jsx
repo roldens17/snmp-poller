@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Login } from './pages/Login';
+import { ToastProvider } from './components/ToastProvider';
 
 
 function AppShell() {
@@ -37,6 +38,7 @@ function AppShell() {
 
 function App() {
   return (
+    <ToastProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -52,6 +54,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ToastProvider>
   );
 }
 
