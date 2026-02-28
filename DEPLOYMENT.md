@@ -112,3 +112,33 @@ docker compose up -d --build
    export ENCRYPTION_KEY="your-secure-key"
    docker compose up -d --build
    ```
+
+## Phase 0 Hardening Checklist (SaaS baseline)
+
+Before public deployment:
+
+1. Disable insecure defaults
+   - `DEMO_MODE=false`
+   - `AUTH_ALLOW_REGISTER=false`
+2. Rotate secrets
+   - `AUTH_JWT_SECRET` (long random)
+   - `ENCRYPTION_KEY` (32-byte base64)
+   - `POSTGRES_PASSWORD` (strong)
+3. Cookie security
+   - `AUTH_COOKIE_SECURE=true` (HTTPS only)
+   - `AUTH_COOKIE_HTTP_ONLY=true`
+   - `AUTH_COOKIE_SAME_SITE=none` (when app/api on different subdomains)
+   - `AUTH_COOKIE_DOMAIN=.yourdomain.com`
+4. CORS lockdown
+   - `CORS_ALLOWED_ORIGINS=https://app.yourdomain.com`
+5. DB exposure
+   - Do NOT publish Postgres port publicly.
+6. TLS + proxy
+   - Put app/api behind HTTPS reverse proxy.
+
+Quick secret generation:
+```bash
+openssl rand -base64 48   # AUTH_JWT_SECRET
+openssl rand -base64 32   # ENCRYPTION_KEY
+openssl rand -base64 24   # POSTGRES_PASSWORD
+```

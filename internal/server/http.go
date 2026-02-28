@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,10 +24,11 @@ import (
 
 // HTTPServer exposes REST + metrics endpoints.
 type HTTPServer struct {
-	cfg       *config.Config
-	store     *store.Store
-	auth      *auth.Service
-	deviceReg DeviceRegistrar
+	cfg         *config.Config
+	store       *store.Store
+	auth        *auth.Service
+	deviceReg   DeviceRegistrar
+	loginLimiter *IPRateLimiter
 }
 
 type macEntryView struct {
@@ -51,10 +54,11 @@ func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
 		log.Warn().Err(err).Msg("device registration encryption disabled")
 	}
 	return &HTTPServer{
-		cfg:       cfg,
-		store:     db,
-		auth:      auth.NewService(cfg.Auth),
-		deviceReg: devicereg.NewService(db, encryptor),
+		cfg:         cfg,
+		store:       db,
+		auth:        auth.NewService(cfg.Auth),
+		deviceReg:   devicereg.NewService(db, encryptor),
+		loginLimiter: NewIPRateLimiter(rate.Limit(float64(cfg.Auth.LoginRatePerMinute)/60.0), cfg.Auth.LoginBurst),
 	}
 }
 
@@ -67,6 +71,17 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	}
 	engine := gin.New()
 	engine.Use(gin.Recovery())
+	engine.Use(func(c *gin.Context) {
+		h := c.Writer.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("X-XSS-Protection", "0")
+		if c.Request.TLS != nil {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		c.Next()
+	})
 	engine.Use(func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
@@ -402,7 +417,7 @@ func (s *HTTPServer) handleSystemStatus(c *gin.Context) {
 
 func (s *HTTPServer) respondErr(c *gin.Context, err error) {
 	log.Warn().Err(err).Msg("api error")
-	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 }
 
 func (s *HTTPServer) getTenantID(c *gin.Context) string {

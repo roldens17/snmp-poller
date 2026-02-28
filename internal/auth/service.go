@@ -14,10 +14,13 @@ const bcryptCost = 12
 
 // Service handles JWT creation and cookie settings.
 type Service struct {
-	secret       []byte
-	cookieName   string
-	cookieSecure bool
-	tokenTTL     time.Duration
+	secret         []byte
+	cookieName     string
+	cookieSecure   bool
+	cookieHTTPOnly bool
+	cookieSameSite string
+	cookieDomain   string
+	tokenTTL       time.Duration
 }
 
 // Claims captures the JWT payload for sessions.
@@ -44,10 +47,13 @@ func NewService(cfg config.AuthConfig) *Service {
 	}
 
 	return &Service{
-		secret:       []byte(cfg.JWTSecret),
-		cookieName:   cfg.CookieName,
-		cookieSecure: cfg.CookieSecureValue(),
-		tokenTTL:     ttl,
+		secret:         []byte(cfg.JWTSecret),
+		cookieName:     cfg.CookieName,
+		cookieSecure:   cfg.CookieSecureValue(),
+		cookieHTTPOnly: cfg.CookieHTTPOnlyValue(),
+		cookieSameSite: cfg.CookieSameSiteValue(),
+		cookieDomain:   cfg.CookieDomain,
+		tokenTTL:       ttl,
 	}
 }
 
@@ -59,6 +65,21 @@ func (s *Service) CookieName() string {
 // CookieSecure returns the secure cookie flag.
 func (s *Service) CookieSecure() bool {
 	return s.cookieSecure
+}
+
+// CookieHTTPOnly returns the cookie httpOnly flag.
+func (s *Service) CookieHTTPOnly() bool {
+	return s.cookieHTTPOnly
+}
+
+// CookieSameSite returns cookie SameSite mode string.
+func (s *Service) CookieSameSite() string {
+	return s.cookieSameSite
+}
+
+// CookieDomain returns cookie domain.
+func (s *Service) CookieDomain() string {
+	return s.cookieDomain
 }
 
 // TokenTTL returns the JWT TTL.

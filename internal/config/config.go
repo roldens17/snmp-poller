@@ -101,11 +101,16 @@ type HTTPConfig struct {
 
 // AuthConfig defines authentication settings.
 type AuthConfig struct {
-	JWTSecret     string   `yaml:"jwt_secret"`
-	CookieName    string   `yaml:"cookie_name"`
-	CookieSecure  *bool    `yaml:"cookie_secure"`
-	TokenTTL      Duration `yaml:"token_ttl"`
-	AllowRegister bool     `yaml:"allow_register"`
+	JWTSecret          string   `yaml:"jwt_secret"`
+	CookieName         string   `yaml:"cookie_name"`
+	CookieSecure       *bool    `yaml:"cookie_secure"`
+	CookieHTTPOnly     *bool    `yaml:"cookie_http_only"`
+	CookieSameSite     string   `yaml:"cookie_same_site"`
+	CookieDomain       string   `yaml:"cookie_domain"`
+	TokenTTL           Duration `yaml:"token_ttl"`
+	AllowRegister      bool     `yaml:"allow_register"`
+	LoginRatePerMinute int      `yaml:"login_rate_per_minute"`
+	LoginBurst         int      `yaml:"login_burst"`
 }
 
 // CookieSecureValue returns the secure cookie setting, defaulting to false.
@@ -114,6 +119,22 @@ func (a AuthConfig) CookieSecureValue() bool {
 		return false
 	}
 	return *a.CookieSecure
+}
+
+// CookieHTTPOnlyValue returns httpOnly cookie setting, defaulting to true.
+func (a AuthConfig) CookieHTTPOnlyValue() bool {
+	if a.CookieHTTPOnly == nil {
+		return true
+	}
+	return *a.CookieHTTPOnly
+}
+
+// CookieSameSiteValue returns SameSite mode string (lax|strict|none).
+func (a AuthConfig) CookieSameSiteValue() string {
+	if strings.TrimSpace(a.CookieSameSite) == "" {
+		return "lax"
+	}
+	return strings.ToLower(strings.TrimSpace(a.CookieSameSite))
 }
 
 // SNMPDefaults captures default switch polling parameters.
@@ -234,6 +255,19 @@ func (c *Config) applyDefaults() {
 	if c.Auth.CookieSecure == nil {
 		secure := strings.EqualFold(os.Getenv("ENV"), "production")
 		c.Auth.CookieSecure = &secure
+	}
+	if c.Auth.CookieHTTPOnly == nil {
+		httpOnly := true
+		c.Auth.CookieHTTPOnly = &httpOnly
+	}
+	if strings.TrimSpace(c.Auth.CookieSameSite) == "" {
+		c.Auth.CookieSameSite = "lax"
+	}
+	if c.Auth.LoginRatePerMinute <= 0 {
+		c.Auth.LoginRatePerMinute = 20
+	}
+	if c.Auth.LoginBurst <= 0 {
+		c.Auth.LoginBurst = 10
 	}
 
 	if c.SNMP.Port == 0 {
@@ -368,6 +402,16 @@ func (c *Config) applyEnvOverrides() {
 		secure := v == "1" || strings.EqualFold(v, "true")
 		c.Auth.CookieSecure = &secure
 	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_COOKIE_HTTP_ONLY")); v != "" {
+		httpOnly := v == "1" || strings.EqualFold(v, "true")
+		c.Auth.CookieHTTPOnly = &httpOnly
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_COOKIE_SAME_SITE")); v != "" {
+		c.Auth.CookieSameSite = strings.ToLower(v)
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_COOKIE_DOMAIN")); v != "" {
+		c.Auth.CookieDomain = v
+	}
 	if v := strings.TrimSpace(os.Getenv("AUTH_TOKEN_TTL_HOURS")); v != "" {
 		if hours, err := strconv.Atoi(v); err == nil && hours > 0 {
 			c.Auth.TokenTTL.Duration = time.Duration(hours) * time.Hour
@@ -375,6 +419,16 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := strings.TrimSpace(os.Getenv("AUTH_ALLOW_REGISTER")); v != "" {
 		c.Auth.AllowRegister = v == "1" || strings.EqualFold(v, "true")
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_LOGIN_RATE_PER_MIN")); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			c.Auth.LoginRatePerMinute = i
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("AUTH_LOGIN_BURST")); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			c.Auth.LoginBurst = i
+		}
 	}
 	if v := strings.TrimSpace(os.Getenv("DEMO_MODE")); v != "" {
 		c.DemoMode = v == "1" || strings.EqualFold(v, "true")

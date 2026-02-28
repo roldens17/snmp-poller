@@ -1,8 +1,6 @@
-const apiBase = import.meta.env.VITE_API_BASE_URL;
-if (!apiBase) {
-    throw new Error("VITE_API_BASE_URL is not set; configure it to the API origin reachable from the browser.");
-}
-const API_BASE = apiBase.replace(/\/$/, "");
+const envApiBase = import.meta.env.VITE_API_BASE_URL;
+const fallbackApiBase = `${window.location.protocol}//${window.location.hostname}:8081`;
+const API_BASE = (envApiBase || fallbackApiBase).replace(/\/$/, "");
 
 async function fetchWithTimeout(path, options = {}) {
     const { timeout = 5000, retryOn = [] } = options;

@@ -35,8 +35,25 @@ func toAuthUserResponse(u *store.User) authUserResponse {
 }
 
 func (s *HTTPServer) setAuthCookie(c *gin.Context, token string, maxAge int) {
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(s.auth.CookieName(), token, maxAge, "/", "", s.auth.CookieSecure(), true)
+	sameSite := http.SameSiteLaxMode
+	switch s.auth.CookieSameSite() {
+	case "strict":
+		sameSite = http.SameSiteStrictMode
+	case "none":
+		sameSite = http.SameSiteNoneMode
+	default:
+		sameSite = http.SameSiteLaxMode
+	}
+	c.SetSameSite(sameSite)
+	c.SetCookie(
+		s.auth.CookieName(),
+		token,
+		maxAge,
+		"/",
+		s.auth.CookieDomain(),
+		s.auth.CookieSecure(),
+		s.auth.CookieHTTPOnly(),
+	)
 }
 
 // authRequired middleware ...
@@ -130,6 +147,13 @@ func (s *HTTPServer) getAuthTenant(c *gin.Context) (*store.Tenant, bool) {
 }
 
 func (s *HTTPServer) handleAuthLogin(c *gin.Context) {
+	if s.loginLimiter != nil {
+		if !s.loginLimiter.Allow(c.ClientIP()) {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many login attempts"})
+			return
+		}
+	}
+
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -248,8 +272,16 @@ func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 		return
 	}
 
-	// For registration, we might not have a tenant yet, so we can't fully log them in with a valid tenant session.
-	// Returning created user is fine. Login later will handle tenant resolution.
+	// Auto-assign to default tenant so first login succeeds.
+	defaultSlug := s.cfg.DefaultTenantSlug
+	if strings.TrimSpace(defaultSlug) == "" {
+		defaultSlug = "default"
+	}
+	tenant, err := s.store.GetTenantBySlug(c.Request.Context(), defaultSlug)
+	if err == nil {
+		_ = s.store.AddUserToTenant(c.Request.Context(), user.ID, tenant.ID, "owner")
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user)})
 }
 
