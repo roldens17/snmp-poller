@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { Trash2, Plus, Bell, Settings as SettingsIcon, Save, X, Shield, CreditCard, Send, FileClock, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,7 +21,11 @@ function Badge({ children, tone = 'gray' }) {
 export function Settings() {
   const toast = useToast();
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState('billing');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const allowedTabs = ['billing', 'invites', 'alerts', 'audit'];
+  const rawTab = searchParams.get('tab') || 'billing';
+  const tabFromUrl = allowedTabs.includes(rawTab) ? rawTab : 'billing';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -193,6 +198,18 @@ export function Settings() {
     { id: 'alerts', label: 'Alerts', icon: Bell },
     { id: 'audit', label: 'Audit', icon: FileClock },
   ];
+
+  useEffect(() => {
+    if (tabFromUrl !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
+    }
+  }, [activeTab, tabFromUrl, setSearchParams]);
+
+  useEffect(() => {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6 max-w-6xl mx-auto">

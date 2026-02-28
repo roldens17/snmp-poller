@@ -3,16 +3,29 @@ const fallbackApiBase = `${window.location.protocol}//${window.location.hostname
 const API_BASE = (envApiBase || fallbackApiBase).replace(/\/$/, "");
 
 async function fetchWithTimeout(path, options = {}) {
-    const { timeout = 5000, retryOn = [] } = options;
+    const { timeout = 5000, retryOn = [], suppressGlobalError = false } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
 
     try {
-        const response = await fetch(`${API_BASE}${path}`, {
-            ...options,
-            credentials: 'include',
-            signal: controller.signal
-        });
+        let response;
+        try {
+            response = await fetch(`${API_BASE}${path}`, {
+                ...options,
+                credentials: 'include',
+                signal: controller.signal
+            });
+        } catch (networkErr) {
+            const err = new Error(networkErr?.message || 'Network request failed');
+            err.status = 0;
+            err.body = null;
+            if (!suppressGlobalError && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('api:error', {
+                    detail: { status: 0, path, message: 'Network error. Please check connectivity.' }
+                }));
+            }
+            throw err;
+        }
 
         if (!response.ok) {
             if (retryOn.includes(response.status)) {
@@ -33,6 +46,16 @@ async function fetchWithTimeout(path, options = {}) {
             const err = new Error(`Request failed with status ${response.status}`);
             err.status = response.status;
             err.body = body;
+
+            if (!suppressGlobalError && response.status >= 500 && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('api:error', {
+                    detail: {
+                        status: response.status,
+                        path,
+                        message: (body && body.error) ? body.error : 'Server error. Try again.'
+                    }
+                }));
+            }
             throw err;
         }
 
@@ -63,10 +86,10 @@ export const api = {
     getAlerts: (active = true) => fetchWithTimeout(`/alerts?active=${active}`),
     getDiscovery: () => fetchWithTimeout(`/discovery`),
     getHealth: () => fetchWithTimeout(`/healthz`),
-    getSystemStatus: () => fetchWithTimeout(`/system/status`),
+    getSystemStatus: () => fetchWithTimeout(`/system/status`, { suppressGlobalError: true }),
     login: (email, password) => postJson(`/auth/login`, { email, password }),
     logout: () => postJson(`/auth/logout`, {}),
-    me: () => fetchWithTimeout(`/auth/me`),
+    me: () => fetchWithTimeout(`/auth/me`, { suppressGlobalError: true }),
     getTenants: () => fetchWithTimeout(`/tenants`),
     getActiveTenant: () => fetchWithTimeout(`/tenants/active`),
     setActiveTenant: (tenantId) => postJson(`/tenants/active`, { tenant_id: tenantId }),

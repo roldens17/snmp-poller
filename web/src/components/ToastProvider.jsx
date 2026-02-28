@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const ToastContext = createContext(null);
 
@@ -16,6 +16,23 @@ export function ToastProvider({ children }) {
       setTimeout(() => removeToast(id), durationMs);
     }
   };
+
+  const lastGlobalErrorRef = useRef({ key: '', at: 0 });
+
+  useEffect(() => {
+    const onApiError = (e) => {
+      const d = e?.detail || {};
+      const key = `${d.status || 0}:${d.path || ''}:${d.message || ''}`;
+      const now = Date.now();
+      if (lastGlobalErrorRef.current.key === key && now - lastGlobalErrorRef.current.at < 4000) {
+        return;
+      }
+      lastGlobalErrorRef.current = { key, at: now };
+      pushToast(d.message || 'Request failed', 'error', 3200);
+    };
+    window.addEventListener('api:error', onApiError);
+    return () => window.removeEventListener('api:error', onApiError);
+  }, []);
 
   const api = useMemo(() => ({
     success: (msg, ms) => pushToast(msg, 'success', ms),
