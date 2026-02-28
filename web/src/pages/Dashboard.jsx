@@ -88,15 +88,9 @@ export function Dashboard() {
         navigate(`/devices/${talker.deviceId}`);
     };
 
-    const handleTenantSelect = async (tenantId) => {
+    const loadTenantDetails = async (tenantId, { silent = false } = {}) => {
         if (!tenantId) return;
-        if (selectedTenantId === tenantId) {
-            setSelectedTenantId('');
-            setTenantDetails({ devices_down: [], active_alerts: [] });
-            return;
-        }
-        setSelectedTenantId(tenantId);
-        setTenantDetailsLoading(true);
+        if (!silent) setTenantDetailsLoading(true);
         try {
             const details = await api.getTenantOverviewDetails(tenantId);
             setTenantDetails({
@@ -105,11 +99,30 @@ export function Dashboard() {
             });
         } catch (err) {
             console.error('failed tenant details', err);
-            setTenantDetails({ devices_down: [], active_alerts: [] });
+            if (!silent) setTenantDetails({ devices_down: [], active_alerts: [] });
         } finally {
-            setTenantDetailsLoading(false);
+            if (!silent) setTenantDetailsLoading(false);
         }
     };
+
+    const handleTenantSelect = async (tenantId) => {
+        if (!tenantId) return;
+        if (selectedTenantId === tenantId) {
+            setSelectedTenantId('');
+            setTenantDetails({ devices_down: [], active_alerts: [] });
+            return;
+        }
+        setSelectedTenantId(tenantId);
+        await loadTenantDetails(tenantId);
+    };
+
+    useEffect(() => {
+        if (!selectedTenantId) return;
+        const id = setInterval(() => {
+            loadTenantDetails(selectedTenantId, { silent: true });
+        }, 30000);
+        return () => clearInterval(id);
+    }, [selectedTenantId]);
 
     if (loading) {
         return (
