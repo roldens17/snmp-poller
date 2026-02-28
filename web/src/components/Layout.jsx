@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, Menu, Bell, Settings, RefreshCw, CircleDot } from 'lucide-react';
+import { LayoutDashboard, Server, ToggleLeft, Network, BellRing, FileText, Zap, Menu, Bell, Settings, RefreshCw, CircleDot, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { api } from '../api';
@@ -99,6 +99,7 @@ export function Layout({ children, user, onLogout }) {
         { label: 'Topology Map', path: '/topology', icon: Network },
         { label: 'Alerts', path: '/alerts', icon: BellRing, alert: true },
         { label: 'Reports', path: '/reports', icon: FileText },
+        { label: 'Admin', path: '/settings', icon: ShieldCheck },
     ];
 
     return (
@@ -295,7 +296,7 @@ export function Layout({ children, user, onLogout }) {
                             <Bell className="w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] transition" />
                         </Link>
                         <div className="h-8 w-[1px] bg-rich-dark"></div>
-                        <Link to="/settings" className="p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition">
+                        <Link to="/settings" title="Admin" className="p-2.5 rounded-full text-gray-400 hover:text-gold hover:bg-white/5 transition">
                             <Settings className="w-5 h-5 hover:rotate-90 transition-transform duration-500" />
                         </Link>
                     </div>
