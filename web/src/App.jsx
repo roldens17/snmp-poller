@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Login } from './pages/Login';
 import { ToastProvider } from './components/ToastProvider';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 
 function AppShell() {
@@ -38,6 +39,7 @@ function AppShell() {
 
 function App() {
   return (
+    <ConfirmProvider>
     <ToastProvider>
     <AuthProvider>
       <BrowserRouter>
@@ -55,6 +57,7 @@ function App() {
       </BrowserRouter>
     </AuthProvider>
     </ToastProvider>
+    </ConfirmProvider>
   );
 }
 

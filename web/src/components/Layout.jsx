@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { api } from '../api';
 import { useToast } from './ToastProvider';
+import { useConfirm } from './ConfirmProvider';
 
 export function Layout({ children, user, onLogout }) {
     const location = useLocation();
@@ -14,6 +15,7 @@ export function Layout({ children, user, onLogout }) {
     const [systemStatus, setSystemStatus] = useState({ state: 'checking', error: '', updatedAt: null });
     const [alertCount, setAlertCount] = useState(0);
     const toast = useToast();
+    const { confirm } = useConfirm();
 
     // Fetch tenants on mount
     useEffect(() => {
@@ -266,7 +268,7 @@ export function Layout({ children, user, onLogout }) {
                         {/* Demo Controls */}
                         <div className="flex gap-2">
                             <button onClick={async () => {
-                                if (confirm("Seed demo data?")) {
+                                if (await confirm("Seed demo data?")) {
                                     try {
                                         const res = await api.seedDemo();
                                         toast.success(`Demo seeded: ${JSON.stringify(res.stats)}`)
@@ -277,7 +279,7 @@ export function Layout({ children, user, onLogout }) {
                                 Seed Demo
                             </button>
                             <button onClick={async () => {
-                                if (confirm("Reset demo data?")) {
+                                if (await confirm("Reset demo data?")) {
                                     try {
                                         await api.resetDemo();
                                         toast.success("Demo data reset")

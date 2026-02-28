@@ -4,6 +4,7 @@ import { Trash2, Plus, Bell, Settings as SettingsIcon, Save, X, Shield, CreditCa
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useToast } from '../components/ToastProvider';
+import { useConfirm } from '../components/ConfirmProvider';
 
 function Badge({ children, tone = 'gray' }) {
   const tones = {
@@ -18,6 +19,7 @@ function Badge({ children, tone = 'gray' }) {
 
 export function Settings() {
   const toast = useToast();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState('billing');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -108,7 +110,7 @@ export function Settings() {
   };
 
   const handleWebhookDelete = async (id) => {
-    if (!confirm('Delete this webhook destination?')) return;
+    if (!await confirm('Delete this webhook destination?')) return;
     setBusy(prev => ({ ...prev, deletingWebhookId: id }));
     try {
       await api.deleteAlertDestination(id);
@@ -172,7 +174,7 @@ export function Settings() {
   };
 
   const handleDeleteInvite = async (id) => {
-    if (!confirm('Delete this invite?')) return;
+    if (!await confirm('Delete this invite?')) return;
     setBusy(prev => ({ ...prev, deletingInviteId: id }));
     try {
       await api.deleteInvite(id);

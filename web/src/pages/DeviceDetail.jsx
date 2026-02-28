@@ -6,6 +6,8 @@ import { parseAPITimestamp } from '../utils/time';
 import clsx from 'clsx';
 import { Briefcase, Activity, Shield, Trash2, ArrowLeft } from 'lucide-react';
 import { formatHost, getDeviceStatusInfo } from '../utils/deviceStatus';
+import { useConfirm } from '../components/ConfirmProvider';
+import { useToast } from '../components/ToastProvider';
 
 export function DeviceDetail() {
     const { id } = useParams();
@@ -17,6 +19,8 @@ export function DeviceDetail() {
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeTab, setActiveTab] = useState('interfaces'); // 'interfaces' | 'macs'
+    const { confirm } = useConfirm();
+    const toast = useToast();
 
     useEffect(() => {
         async function load() {
@@ -52,14 +56,16 @@ export function DeviceDetail() {
     const handleDelete = async () => {
         if (deleting) return;
         setDeleteError('');
-        if (!window.confirm('Delete this device and all associated data?')) return;
+        if (!await confirm('Delete this device and all associated data?')) return;
         setDeleting(true);
         try {
             await api.deleteDevice(id);
+            toast.success('Device deleted');
             navigate('/devices', { replace: true });
         } catch (err) {
             console.error('Failed to delete device', err);
             setDeleteError('Unable to delete device right now.');
+            toast.error('Unable to delete device right now.');
         } finally {
             setDeleting(false);
         }
