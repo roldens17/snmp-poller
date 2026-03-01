@@ -22,8 +22,9 @@ export function Signup() {
 
     try {
       await authAPI.signup(email, password, name, tenantName);
-      toast.success('Account created successfully! Please log in.');
-      navigate('/login');
+      await authAPI.login(email, password);
+      toast.success('Account created. Welcome aboard!');
+      navigate('/');
     } catch (error: any) {
       console.error('Signup error:', error);
       toast.error(error.message || 'Failed to create account');
