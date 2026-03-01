@@ -1,4 +1,5 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, redirect } from "react-router-dom";
+
 import { Root } from "./components/Root";
 
 const Dashboard = async () => ({ Component: (await import("./components/Dashboard")).Dashboard });
@@ -37,14 +38,14 @@ export const router = createBrowserRouter([
       { path: "reports/print", lazy: ReportPrint },
       { path: "topology", lazy: Topology },
       { path: "settings", lazy: Settings },
-      { path: "snmp/clients", lazy: LegacyClients },
-      { path: "snmp/switches", lazy: LegacySwitches },
-      { path: "snmp/topology", lazy: LegacyTopology },
-      { path: "snmp/alerts", lazy: LegacyAlerts },
-      { path: "snmp/reports", lazy: LegacyReports },
-      { path: "snmp/settings", lazy: LegacySettings },
-      { path: "snmp/devices/new", lazy: LegacyDeviceNew },
-      { path: "snmp/devices/:id", lazy: LegacyDeviceDetail },
+      { path: "snmp/clients", loader: () => redirect("/devices") },
+      { path: "snmp/switches", loader: () => redirect("/devices") },
+      { path: "snmp/topology", loader: () => redirect("/topology") },
+      { path: "snmp/alerts", loader: () => redirect("/incidents") },
+      { path: "snmp/reports", loader: () => redirect("/reports") },
+      { path: "snmp/settings", loader: () => redirect("/settings") },
+      { path: "snmp/devices/new", loader: () => redirect("/devices") },
+      { path: "snmp/devices/:id", loader: () => redirect("/devices") },
     ],
   },
   {
