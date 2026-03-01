@@ -5,7 +5,7 @@ import { Octagon, AlertTriangle, ArrowRight, BellRing, RefreshCw } from 'lucide-
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import { parseAPITriggeredstamp } from '../utils/time';
+import { parseAPITimestamp } from '../utils/time';
 
 export function Alerts() {
     const [alerts, setAlerts] = useState([]);
@@ -132,7 +132,7 @@ export function Alerts() {
                                 </div>
                                 <div className="p-4 col-span-2 text-xs text-gray-500 font-mono tracking-wide">
                                     {(() => {
-                                        const ts = parseAPITriggeredstamp(a.triggered_at);
+                                        const ts = parseAPITimestamp(a.triggered_at);
                                         return ts ? formatDistanceToNow(ts, { addSuffix: true }) : 'unknown';
                                     })()}
                                 </div>
