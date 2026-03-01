@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -236,6 +237,53 @@ func (s *HTTPServer) handleAuthMe(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func slugifyTenantName(name string) string {
+	slug := strings.ToLower(strings.TrimSpace(name))
+	slug = strings.ReplaceAll(slug, "_", "-")
+	slug = strings.ReplaceAll(slug, " ", "-")
+	var b strings.Builder
+	prevDash := false
+	for _, r := range slug {
+		ok := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-'
+		if !ok {
+			continue
+		}
+		if r == '-' {
+			if prevDash {
+				continue
+			}
+			prevDash = true
+		} else {
+			prevDash = false
+		}
+		b.WriteRune(r)
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		out = "tenant"
+	}
+	return out
+}
+
+func uniqueTenantSlug(ctx *gin.Context, s *HTTPServer, base string) (string, error) {
+	base = slugifyTenantName(base)
+	for i := 0; i < 20; i++ {
+		candidate := base
+		if i > 0 {
+			candidate = fmt.Sprintf("%s-%d", base, i+1)
+		}
+		_, err := s.store.GetTenantBySlug(ctx.Request.Context(), candidate)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("unable to allocate unique tenant slug")
+}
+
 func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 	if !s.cfg.Auth.AllowRegister {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -243,9 +291,10 @@ func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 	}
 
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Name     string `json:"name"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		Name       string `json:"name"`
+		TenantName string `json:"tenant_name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
@@ -275,17 +324,38 @@ func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 		return
 	}
 
-	// Auto-assign to default tenant so first login succeeds.
-	defaultSlug := s.cfg.DefaultTenantSlug
-	if strings.TrimSpace(defaultSlug) == "" {
-		defaultSlug = "default"
-	}
-	tenant, err := s.store.GetTenantBySlug(c.Request.Context(), defaultSlug)
-	if err == nil {
-		_ = s.store.AddUserToTenant(c.Request.Context(), user.ID, tenant.ID, "owner")
+	// Tenant assignment: create org if provided, otherwise assign to default tenant.
+	var assignedTenantID string
+	tenantName := strings.TrimSpace(req.TenantName)
+	if tenantName != "" {
+		slug, err := uniqueTenantSlug(c, s, tenantName)
+		if err != nil {
+			s.respondErr(c, err)
+			return
+		}
+		tenant, err := s.store.CreateTenant(c.Request.Context(), tenantName, slug)
+		if err != nil {
+			s.respondErr(c, err)
+			return
+		}
+		if err := s.store.AddUserToTenant(c.Request.Context(), user.ID, tenant.ID, "owner"); err != nil {
+			s.respondErr(c, err)
+			return
+		}
+		assignedTenantID = tenant.ID
+	} else {
+		defaultSlug := s.cfg.DefaultTenantSlug
+		if strings.TrimSpace(defaultSlug) == "" {
+			defaultSlug = "default"
+		}
+		tenant, err := s.store.GetTenantBySlug(c.Request.Context(), defaultSlug)
+		if err == nil {
+			_ = s.store.AddUserToTenant(c.Request.Context(), user.ID, tenant.ID, "owner")
+			assignedTenantID = tenant.ID
+		}
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user)})
+	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user), "tenant_id": assignedTenantID})
 }
 
 

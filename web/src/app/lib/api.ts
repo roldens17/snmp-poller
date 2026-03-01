@@ -38,10 +38,10 @@ function mapDevice(device: any) {
 
 // Auth API
 export const authAPI = {
-  async signup(email: string, password: string, name: string, _tenantName: string) {
+  async signup(email: string, password: string, name: string, tenantName: string) {
     return apiRequest('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, tenant_name: tenantName }),
     });
   },
 

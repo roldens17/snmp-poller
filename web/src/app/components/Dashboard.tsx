@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { reportsAPI, incidentAPI, deviceAPI } from '../lib/api';
+import { reportsAPI, incidentAPI, deviceAPI, webhookAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Server, AlertTriangle, Activity, TrendingUp } from 'lucide-react';
 import { Progress } from './ui/progress';
@@ -14,6 +14,8 @@ export function Dashboard() {
   const [devices, setDevices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(false);
+  const [webhookCount, setWebhookCount] = useState(0);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('newUIOnboardingDismissed') === '1');
 
   useEffect(() => {
     loadData();
@@ -23,15 +25,17 @@ export function Dashboard() {
 
   async function loadData() {
     try {
-      const [summaryRes, incidentsRes, devicesRes] = await Promise.all([
+      const [summaryRes, incidentsRes, devicesRes, webhooksRes] = await Promise.all([
         reportsAPI.getHealthSummary(),
         incidentAPI.list('open'),
         deviceAPI.list(),
+        webhookAPI.list(),
       ]);
 
       setSummary(summaryRes.summary);
       setIncidents(incidentsRes.incidents || []);
       setDevices(devicesRes.devices || []);
+      setWebhookCount((webhooksRes.webhooks || []).filter((w: any) => w.enabled).length);
     } catch (error: any) {
       console.error('Dashboard load error:', error);
       toast.error('Failed to load dashboard data');
@@ -86,8 +90,12 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Show Quick Start if no devices */}
-      {devices.length === 0 && <QuickStart />}
+      <QuickStart
+        hasDevices={devices.length > 0}
+        hasWebhooks={webhookCount > 0}
+        dismissed={onboardingDismissed}
+        onDismiss={() => { setOnboardingDismissed(true); localStorage.setItem('newUIOnboardingDismissed','1'); }}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
