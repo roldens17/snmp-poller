@@ -1,8 +1,12 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/fresatu/snmp-poller/internal/store"
 	"github.com/gin-gonic/gin"
@@ -147,4 +151,63 @@ func redactURL(u string) string {
 		return "..."
 	}
 	return u[:8] + "..." + u[len(u)-4:]
+}
+
+
+func (s *HTTPServer) handleTestAlertDestination(c *gin.Context) {
+	id := c.Param("id")
+	tenantID := s.getTenantID(c)
+	dests, err := s.store.ListAlertDestinations(c.Request.Context(), tenantID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	var dest *store.AlertDestination
+	for i := range dests {
+		if dests[i].ID == id {
+			d := dests[i]
+			dest = &d
+			break
+		}
+	}
+	if dest == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	payload := map[string]any{
+		"event": "webhook.test",
+		"message": "SNMP SaaS webhook test",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"tenant_id": tenantID,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, dest.URL, bytes.NewReader(body))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid destination url"})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "SNMP-Poller-Test/1.0")
+
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		_ = s.store.RecordAlertDelivery(c.Request.Context(), store.AlertDelivery{TenantID: tenantID, DestinationID: dest.ID, AlertID: 0, Event: "webhook.test", Attempt: 1, Success: false, DurationMs: 0, Error: err.Error()})
+		c.JSON(http.StatusBadGateway, gin.H{"ok": false, "error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	sc := resp.StatusCode
+	success := sc >= 200 && sc < 300
+	_ = s.store.RecordAlertDelivery(c.Request.Context(), store.AlertDelivery{TenantID: tenantID, DestinationID: dest.ID, AlertID: 0, Event: "webhook.test", Attempt: 1, StatusCode: &sc, Success: success, DurationMs: 0, Error: ""})
+
+	if !success {
+		c.JSON(http.StatusBadGateway, gin.H{"ok": false, "status": sc})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "status": sc})
 }

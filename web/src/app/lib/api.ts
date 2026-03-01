@@ -323,6 +323,13 @@ export const webhookAPI = {
       method: 'DELETE',
     });
   },
+
+  async test(webhookId: string) {
+    return apiRequest(`/alert-destinations/${webhookId}/test`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
 };
 
 // Tenant API

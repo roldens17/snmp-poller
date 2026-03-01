@@ -203,6 +203,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.POST("/alert-destinations", s.handleCreateAlertDestination)
 	protected.PATCH("/alert-destinations/:id", s.handleUpdateAlertDestination)
 	protected.DELETE("/alert-destinations/:id", s.handleDeleteAlertDestination)
+	protected.POST("/alert-destinations/:id/test", s.handleTestAlertDestination)
 
 	protected.GET("/alerts", s.handleListAlerts)
 	protected.POST("/alerts/simulate/down", s.handleSimulateAlertDown)

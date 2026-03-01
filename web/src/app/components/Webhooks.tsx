@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
-import { Webhook, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Webhook, Plus, Trash2, CheckCircle, XCircle, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Webhooks() {
@@ -79,6 +79,22 @@ export function Webhooks() {
     } catch (error: any) {
       console.error('Delete webhook error:', error);
       toast.error('Failed to delete webhook');
+    }
+  }
+
+
+  async function handleTest(webhookId: string) {
+    try {
+      const res = await webhookAPI.test(webhookId);
+      if (res?.ok) {
+        toast.success('Test webhook sent successfully');
+      } else {
+        toast.error('Test webhook failed');
+      }
+      loadWebhooks();
+    } catch (error: any) {
+      console.error('Test webhook error:', error);
+      toast.error(error.message || 'Test webhook failed');
     }
   }
 
@@ -196,14 +212,24 @@ export function Webhooks() {
                       {webhook.url}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-midnight-border text-midnight-status-critical bg-midnight-card hover:bg-midnight-bg"
-                    onClick={() => handleDelete(webhook.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-midnight-border text-midnight-text-primary bg-midnight-card hover:bg-midnight-bg"
+                      onClick={() => handleTest(webhook.id)}
+                    >
+                      <Play className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-midnight-border text-midnight-status-critical bg-midnight-card hover:bg-midnight-bg"
+                      onClick={() => handleDelete(webhook.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
