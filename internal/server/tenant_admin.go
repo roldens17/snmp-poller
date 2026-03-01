@@ -336,3 +336,14 @@ func (s *HTTPServer) handleTenantOverviewDetails(c *gin.Context) {
 		"active_alerts": activeAlerts,
 	})
 }
+
+
+func (s *HTTPServer) handleTopology(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	nodes, edges, err := s.store.BuildTopology(c.Request.Context(), tenantID)
+	if err != nil {
+		s.respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"nodes": nodes, "edges": edges})
+}

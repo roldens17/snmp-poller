@@ -6,6 +6,8 @@ const Devices = async () => ({ Component: (await import("./components/Devices"))
 const Incidents = async () => ({ Component: (await import("./components/Incidents")).Incidents });
 const Webhooks = async () => ({ Component: (await import("./components/Webhooks")).Webhooks });
 const Reports = async () => ({ Component: (await import("./components/Reports")).Reports });
+const Topology = async () => ({ Component: (await import("./components/Topology")).Topology });
+const DeviceDetail = async () => ({ Component: (await import("./components/DeviceDetail")).DeviceDetail });
 const Settings = async () => ({ Component: (await import("./components/Settings")).Settings });
 const Login = async () => ({ Component: (await import("./components/Login")).Login });
 const Signup = async () => ({ Component: (await import("./components/Signup")).Signup });
@@ -18,7 +20,7 @@ const LegacyReports = async () => ({ Component: (await import("../legacy/pages/R
 const LegacySettings = async () => ({ Component: (await import("../legacy/pages/Settings")).Settings });
 const LegacyDeviceDetail = async () => ({ Component: (await import("../legacy/pages/DeviceDetail")).DeviceDetail });
 const LegacyDeviceNew = async () => ({ Component: (await import("../legacy/pages/DeviceNew")).DeviceNew });
-const AcceptInvite = async () => ({ Component: (await import("../legacy/pages/AcceptInvite")).AcceptInvite });
+const AcceptInvite = async () => ({ Component: (await import("./components/AcceptInvite")).AcceptInvite });
 
 export const router = createBrowserRouter([
   {
@@ -27,9 +29,11 @@ export const router = createBrowserRouter([
     children: [
       { index: true, lazy: Dashboard },
       { path: "devices", lazy: Devices },
+      { path: "devices/:id", lazy: DeviceDetail },
       { path: "incidents", lazy: Incidents },
       { path: "webhooks", lazy: Webhooks },
       { path: "reports", lazy: Reports },
+      { path: "topology", lazy: Topology },
       { path: "settings", lazy: Settings },
       { path: "snmp/clients", lazy: LegacyClients },
       { path: "snmp/switches", lazy: LegacySwitches },

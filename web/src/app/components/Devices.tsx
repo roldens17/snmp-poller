@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { deviceAPI } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -246,7 +247,7 @@ export function Devices() {
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-medium text-midnight-text-primary">{device.name}</div>
+                        <Link to={`/devices/${device.id}`} className="font-medium text-midnight-text-primary hover:underline">{device.name}</Link>
                         {device.description && (
                           <div className="text-xs text-midnight-text-secondary">{device.description}</div>
                         )}

@@ -85,6 +85,7 @@ export function Root() {
     { name: 'Dashboard', href: '/', icon: Activity },
     { name: 'Devices', href: '/devices', icon: Server },
     { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
+    { name: 'Topology', href: '/topology', icon: Network },
     { name: 'Webhooks', href: '/webhooks', icon: Webhook },
     { name: 'Reports', href: '/reports', icon: FileText },
     { name: 'Settings', href: '/settings', icon: Settings },

@@ -75,6 +75,21 @@ export const deviceAPI = {
     return { devices: (data?.devices || []).map(mapDevice) };
   },
 
+  async getById(deviceId: string) {
+    const d = await apiRequest(`/devices/${deviceId}`);
+    return mapDevice(d);
+  },
+
+  async getInterfaces(deviceId: string) {
+    const data = await apiRequest(`/devices/${deviceId}/interfaces`);
+    return { interfaces: data?.interfaces || [] };
+  },
+
+  async getMacs(deviceId: string) {
+    const data = await apiRequest(`/devices/${deviceId}/macs`);
+    return { mac_entries: data?.mac_entries || [] };
+  },
+
   async create(device: any) {
     const snmp = {
       version: device.snmpVersion || '2c',
@@ -419,5 +434,12 @@ export const inviteAPI = {
     return apiRequest(`/tenants/invites/${inviteId}`, {
       method: 'DELETE',
     });
+  },
+};
+
+
+export const topologyAPI = {
+  async get() {
+    return apiRequest('/api/topology');
   },
 };

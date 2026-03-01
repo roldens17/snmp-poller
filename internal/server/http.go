@@ -197,6 +197,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	api.GET("/alerts", s.handleAPIAlerts)
 	api.GET("/tenants/overview", s.handleTenantsOverview)
 	api.GET("/tenants/:id/overview-details", s.handleTenantOverviewDetails)
+	api.GET("/topology", s.handleTopology)
 	protected.GET("/macs", s.handleListMacs)
 	protected.GET("/alert-destinations", s.handleListAlertDestinations)
 	protected.POST("/alert-destinations", s.handleCreateAlertDestination)
@@ -213,6 +214,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.POST("/alerts/:id/resolve", s.handleResolveAlert)
 	protected.GET("/alerts/:id/timeline", s.handleAlertTimeline)
 	protected.GET("/alerts/deliveries", s.handleListAlertDeliveries)
+	protected.GET("/topology", s.handleTopology)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
 			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
