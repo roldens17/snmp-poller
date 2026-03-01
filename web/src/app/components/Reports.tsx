@@ -3,7 +3,7 @@ import { reportsAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Reports() {
@@ -53,9 +53,10 @@ export function Reports() {
               </Select>
             </div>
             <Button onClick={generate} disabled={loading} className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600">{loading ? 'Generating...' : 'Generate'}</Button>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button variant="outline" onClick={() => reportsAPI.downloadSLAcsv()}><Download className="w-4 h-4 mr-1" />SLA CSV</Button>
               <Button variant="outline" onClick={() => reportsAPI.downloadIncidentsCSV()}><Download className="w-4 h-4 mr-1" />Incidents CSV</Button>
+              <Button variant="outline" onClick={() => window.open(`/reports/print?days=${days}`, '_blank')}><FileDown className="w-4 h-4 mr-1" />Print/PDF</Button>
             </div>
           </div>
         </CardContent>

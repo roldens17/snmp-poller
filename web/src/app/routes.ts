@@ -6,6 +6,7 @@ const Devices = async () => ({ Component: (await import("./components/Devices"))
 const Incidents = async () => ({ Component: (await import("./components/Incidents")).Incidents });
 const Webhooks = async () => ({ Component: (await import("./components/Webhooks")).Webhooks });
 const Reports = async () => ({ Component: (await import("./components/Reports")).Reports });
+const ReportPrint = async () => ({ Component: (await import("./components/ReportPrint")).ReportPrint });
 const Topology = async () => ({ Component: (await import("./components/Topology")).Topology });
 const DeviceDetail = async () => ({ Component: (await import("./components/DeviceDetail")).DeviceDetail });
 const Settings = async () => ({ Component: (await import("./components/Settings")).Settings });
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "incidents", lazy: Incidents },
       { path: "webhooks", lazy: Webhooks },
       { path: "reports", lazy: Reports },
+      { path: "reports/print", lazy: ReportPrint },
       { path: "topology", lazy: Topology },
       { path: "settings", lazy: Settings },
       { path: "snmp/clients", lazy: LegacyClients },
