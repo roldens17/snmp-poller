@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -537,4 +538,24 @@ func (s *HTTPServer) handleSendReportNow(c *gin.Context) {
 		_ = s.store.AddReportDeliveryHistory(c.Request.Context(), tenantID, r.Email, "sla_monthly", "sent", from.Format(time.RFC3339), to.Format(time.RFC3339), "")
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "sent": sent, "failed": failed})
+}
+
+
+func (s *HTTPServer) handleReportSMTPCheck(c *gin.Context) {
+	host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
+	port := strings.TrimSpace(os.Getenv("SMTP_PORT"))
+	from := strings.TrimSpace(os.Getenv("SMTP_FROM"))
+	user := strings.TrimSpace(os.Getenv("SMTP_USER"))
+	if host == "" || port == "" || from == "" {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "configured": false, "error": "SMTP_HOST/SMTP_PORT/SMTP_FROM missing"})
+		return
+	}
+	addr := host + ":" + port
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "configured": true, "error": err.Error()})
+		return
+	}
+	_ = conn.Close()
+	c.JSON(http.StatusOK, gin.H{"ok": true, "configured": true, "host": host, "port": port, "from": from, "user_set": user != ""})
 }

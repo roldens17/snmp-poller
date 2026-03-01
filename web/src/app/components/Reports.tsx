@@ -157,10 +157,11 @@ export function Reports() {
       <Card className="bg-midnight-card border border-midnight-border">
         <CardHeader><CardTitle>Report Delivery</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <input value={recipientEmail} onChange={(e)=>setRecipientEmail(e.target.value)} placeholder="client@example.com" className="h-10 flex-1 rounded-md border border-midnight-border bg-midnight-bg px-3 text-sm" />
+          <div className="flex gap-2 flex-wrap">
+            <input value={recipientEmail} onChange={(e)=>setRecipientEmail(e.target.value)} placeholder="client@example.com" className="h-10 flex-1 min-w-[220px] rounded-md border border-midnight-border bg-midnight-bg px-3 text-sm" />
             <Button onClick={addRecipient}>Add recipient</Button>
             <Button variant="outline" onClick={sendNow}><Send className="w-4 h-4 mr-1" />Send now</Button>
+            <Button variant="outline" onClick={async ()=>{ try{ const r=await reportsAPI.smtpCheck(); if(r?.ok) toast.success('SMTP reachable'); else toast.error(r?.error || 'SMTP check failed'); } catch(e:any){ toast.error(e.message || 'SMTP check failed'); } }}>SMTP check</Button>
           </div>
           <div className="space-y-2">
             {recipients.length === 0 ? <div className="text-sm text-midnight-text-secondary">No recipients configured.</div> : recipients.map((r:any)=>(

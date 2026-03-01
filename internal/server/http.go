@@ -226,6 +226,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.DELETE("/reports/recipients/:id", s.handleDeleteReportRecipient)
 	protected.GET("/reports/delivery-history", s.handleReportDeliveryHistory)
 	protected.POST("/reports/send-now", s.handleSendReportNow)
+	protected.GET("/reports/smtp-check", s.handleReportSMTPCheck)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
 			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))

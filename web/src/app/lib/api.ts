@@ -410,6 +410,10 @@ export const reportsAPI = {
     return apiRequest(`/reports/send-now`, { method: "POST" });
   },
 
+  async smtpCheck() {
+    return apiRequest(`/reports/smtp-check`);
+  },
+
   downloadSLAcsv() {
     window.open(`${API_BASE}/reports/sla.csv`, '_blank');
   },
