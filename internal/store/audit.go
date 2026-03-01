@@ -35,3 +35,29 @@ func (s *Store) ListAuditEvents(ctx context.Context, tenantID string, limit int)
 	}
 	return out, rows.Err()
 }
+
+func (s *Store) ListAuditEventsForResource(ctx context.Context, tenantID, resource, resourceID string, limit int) ([]AuditEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, COALESCE(tenant_id::text,''), COALESCE(user_id::text,''), action, resource, COALESCE(resource_id,''), metadata::text, COALESCE(host(ip), ''), created_at
+		FROM audit_events
+		WHERE tenant_id=$1::uuid AND resource=$2 AND resource_id=$3
+		ORDER BY created_at DESC
+		LIMIT $4
+	`, tenantID, resource, resourceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []AuditEvent{}
+	for rows.Next() {
+		var e AuditEvent
+		if err := rows.Scan(&e.ID, &e.TenantID, &e.UserID, &e.Action, &e.Resource, &e.ResourceID, &e.Metadata, &e.IP, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

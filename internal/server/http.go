@@ -24,10 +24,10 @@ import (
 
 // HTTPServer exposes REST + metrics endpoints.
 type HTTPServer struct {
-	cfg         *config.Config
-	store       *store.Store
-	auth        *auth.Service
-	deviceReg   DeviceRegistrar
+	cfg          *config.Config
+	store        *store.Store
+	auth         *auth.Service
+	deviceReg    DeviceRegistrar
 	loginLimiter *IPRateLimiter
 }
 
@@ -54,10 +54,10 @@ func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
 		log.Warn().Err(err).Msg("device registration encryption disabled")
 	}
 	return &HTTPServer{
-		cfg:         cfg,
-		store:       db,
-		auth:        auth.NewService(cfg.Auth),
-		deviceReg:   devicereg.NewService(db, encryptor),
+		cfg:          cfg,
+		store:        db,
+		auth:         auth.NewService(cfg.Auth),
+		deviceReg:    devicereg.NewService(db, encryptor),
 		loginLimiter: NewIPRateLimiter(rate.Limit(float64(cfg.Auth.LoginRatePerMinute)/60.0), cfg.Auth.LoginBurst),
 	}
 }
@@ -204,6 +204,14 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.DELETE("/alert-destinations/:id", s.handleDeleteAlertDestination)
 
 	protected.GET("/alerts", s.handleListAlerts)
+	protected.POST("/alerts/simulate/down", s.handleSimulateAlertDown)
+	protected.POST("/alerts/simulate/recover", s.handleSimulateAlertRecover)
+	protected.POST("/alerts/:id/acknowledge", s.handleAcknowledgeAlert)
+	protected.POST("/alerts/:id/mute", s.handleMuteAlert)
+	protected.POST("/alerts/:id/assign", s.handleAssignAlert)
+	protected.POST("/alerts/:id/comment", s.handleCommentAlert)
+	protected.POST("/alerts/:id/resolve", s.handleResolveAlert)
+	protected.GET("/alerts/:id/timeline", s.handleAlertTimeline)
 	protected.GET("/alerts/deliveries", s.handleListAlertDeliveries)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
