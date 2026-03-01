@@ -400,3 +400,24 @@ export const reportsAPI = {
     };
   },
 };
+
+
+// Invite API
+export const inviteAPI = {
+  async list() {
+    return apiRequest('/tenants/invites');
+  },
+
+  async create(email: string, role: 'viewer' | 'admin' | 'owner' = 'viewer', expiresInHours = 72) {
+    return apiRequest('/tenants/invites', {
+      method: 'POST',
+      body: JSON.stringify({ email, role, expires_in_hours: expiresInHours }),
+    });
+  },
+
+  async remove(inviteId: string) {
+    return apiRequest(`/tenants/invites/${inviteId}`, {
+      method: 'DELETE',
+    });
+  },
+};

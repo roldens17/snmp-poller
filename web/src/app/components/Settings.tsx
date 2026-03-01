@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { authAPI } from '../lib/api';
+import { authAPI, inviteAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
-import { Settings as SettingsIcon, Building2, Bell, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Bell, Database, Send, Trash2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Settings() {
@@ -19,6 +19,11 @@ export function Settings() {
     retentionDays: 90,
   });
 
+  const [invites, setInvites] = useState<any[]>([]);
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'viewer', expiresInHours: 72 });
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -28,10 +33,13 @@ export function Settings() {
       const session = await authAPI.getSession();
       setUser(session.user);
       setTenant(session.tenant);
-      
+
       if (session.tenant?.settings) {
         setSettings(session.tenant.settings);
       }
+
+      const inv = await inviteAPI.list();
+      setInvites(inv?.invites || []);
     } catch (error: any) {
       console.error('Load settings error:', error);
       toast.error('Failed to load settings');
@@ -47,6 +55,40 @@ export function Settings() {
     setSaving(false);
   }
 
+  async function handleCreateInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setCreatingInvite(true);
+    try {
+      const res = await inviteAPI.create(inviteForm.email, inviteForm.role as any, Number(inviteForm.expiresInHours));
+      setInviteForm({ email: '', role: 'viewer', expiresInHours: 72 });
+      setInvites(prev => [res.invite, ...prev]);
+      const url = res?.accept?.url || (res?.accept?.token ? `${window.location.origin}/accept-invite?token=${res.accept.token}` : '');
+      setInviteLink(url);
+      toast.success('Invite created');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create invite');
+    } finally {
+      setCreatingInvite(false);
+    }
+  }
+
+  async function handleDeleteInvite(id: string) {
+    if (!confirm('Delete this invite?')) return;
+    try {
+      await inviteAPI.remove(id);
+      setInvites(prev => prev.filter(i => i.id !== id));
+      toast.success('Invite deleted');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete invite');
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
+    toast.success('Invite link copied');
+  }
+
   if (loading) {
     return <div className="text-center py-8 text-midnight-text-secondary">Loading settings...</div>;
   }
@@ -55,8 +97,64 @@ export function Settings() {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-3xl font-bold text-midnight-text-primary">Settings</h1>
-        <p className="text-midnight-text-secondary mt-1">Manage your account and monitoring preferences</p>
+        <p className="text-midnight-text-secondary mt-1">Manage your account, invites, and monitoring preferences</p>
       </div>
+
+      <Card className="bg-midnight-card border border-midnight-border">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Send className="w-5 h-5" />
+            <CardTitle className="text-midnight-text-primary">Tenant Invites</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleCreateInvite} className="grid md:grid-cols-4 gap-3 items-end">
+            <div className="md:col-span-2 space-y-2">
+              <Label>Email</Label>
+              <Input placeholder="user@example.com" value={inviteForm.email} onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <select className="w-full h-10 rounded-md border border-midnight-border bg-midnight-bg px-3 text-sm" value={inviteForm.role} onChange={(e) => setInviteForm(prev => ({ ...prev, role: e.target.value }))}>
+                <option value="viewer">viewer</option>
+                <option value="admin">admin</option>
+                <option value="owner">owner</option>
+              </select>
+            </div>
+            <Button type="submit" disabled={creatingInvite} className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600">
+              {creatingInvite ? 'Creating...' : 'Create Invite'}
+            </Button>
+          </form>
+
+          {inviteLink && (
+            <div className="p-3 rounded-lg border border-midnight-border bg-midnight-bg">
+              <div className="text-xs text-midnight-text-secondary mb-1">Latest invite link</div>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-midnight-text-primary break-all flex-1">{inviteLink}</code>
+                <Button variant="outline" size="sm" onClick={copyInviteLink}>
+                  <Copy className="w-4 h-4 mr-1" /> Copy
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {invites.length === 0 ? (
+              <p className="text-sm text-midnight-text-secondary">No pending invites.</p>
+            ) : invites.map(inv => (
+              <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-midnight-border bg-midnight-bg">
+                <div>
+                  <div className="text-sm text-midnight-text-primary">{inv.email}</div>
+                  <div className="text-xs text-midnight-text-secondary">role={inv.role} • expires {new Date(inv.expires_at).toLocaleString()}</div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleDeleteInvite(inv.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Organization Settings */}
       <Card className="bg-midnight-card border border-midnight-border">
@@ -83,10 +181,7 @@ export function Settings() {
           </div>
           <div className="space-y-2">
             <Label>Created</Label>
-            <Input
-              value={tenant?.created_at ? new Date(tenant.created_at).toLocaleString() : ''}
-              disabled
-            />
+            <Input value={tenant?.created_at ? new Date(tenant.created_at).toLocaleString() : ''} disabled />
           </div>
         </CardContent>
       </Card>
@@ -102,51 +197,24 @@ export function Settings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="pollInterval">Poll Interval (seconds)</Label>
-            <Input
-              id="pollInterval"
-              type="number"
-              min="30"
-              max="3600"
-              value={settings.pollInterval}
-              onChange={(e) => setSettings({ ...settings, pollInterval: parseInt(e.target.value) })}
-            />
-            <p className="text-xs text-midnight-text-secondary">
-              How often to poll devices for status updates. Minimum: 30 seconds, Maximum: 1 hour
-            </p>
+            <Input id="pollInterval" type="number" min="30" max="3600" value={settings.pollInterval} onChange={(e) => setSettings({ ...settings, pollInterval: parseInt(e.target.value) })} />
+            <p className="text-xs text-midnight-text-secondary">How often to poll devices for status updates. Minimum: 30 seconds, Maximum: 1 hour</p>
           </div>
 
           <Separator />
 
           <div className="space-y-2">
             <Label htmlFor="alertThreshold">Alert Threshold (failed polls)</Label>
-            <Input
-              id="alertThreshold"
-              type="number"
-              min="1"
-              max="10"
-              value={settings.alertThreshold}
-              onChange={(e) => setSettings({ ...settings, alertThreshold: parseInt(e.target.value) })}
-            />
-            <p className="text-xs text-midnight-text-secondary">
-              Number of consecutive failed polls before creating an incident
-            </p>
+            <Input id="alertThreshold" type="number" min="1" max="10" value={settings.alertThreshold} onChange={(e) => setSettings({ ...settings, alertThreshold: parseInt(e.target.value) })} />
+            <p className="text-xs text-midnight-text-secondary">Number of consecutive failed polls before creating an incident</p>
           </div>
 
           <Separator />
 
           <div className="space-y-2">
             <Label htmlFor="retentionDays">Data Retention (days)</Label>
-            <Input
-              id="retentionDays"
-              type="number"
-              min="7"
-              max="365"
-              value={settings.retentionDays}
-              onChange={(e) => setSettings({ ...settings, retentionDays: parseInt(e.target.value) })}
-            />
-            <p className="text-xs text-midnight-text-secondary">
-              How long to keep historical metrics and incident data
-            </p>
+            <Input id="retentionDays" type="number" min="7" max="365" value={settings.retentionDays} onChange={(e) => setSettings({ ...settings, retentionDays: parseInt(e.target.value) })} />
+            <p className="text-xs text-midnight-text-secondary">How long to keep historical metrics and incident data</p>
           </div>
 
           <div className="pt-4">
@@ -157,7 +225,6 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* Alert Preferences */}
       <Card className="bg-midnight-card border border-midnight-border">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -174,21 +241,10 @@ export function Settings() {
                 when incidents occur. Webhooks support Slack, Discord, Microsoft Teams, and custom endpoints.
               </p>
             </div>
-            
-            <div className="text-sm text-midnight-text-secondary">
-              <p className="mb-2">Supported notification events:</p>
-              <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Incident created</li>
-                <li>Incident resolved</li>
-                <li>Device down</li>
-                <li>Device recovered</li>
-              </ul>
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* System Info */}
       <Card className="bg-midnight-card border border-midnight-border">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -212,29 +268,6 @@ export function Settings() {
               <span className="text-midnight-text-secondary">API Status</span>
               <span className="font-medium text-midnight-status-success">Operational</span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* User Profile */}
-      <Card className="bg-midnight-card border border-midnight-border">
-        <CardHeader>
-          <CardTitle className="text-midnight-text-primary">Your Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={user?.name || ''} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={user?.email || ''} disabled />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Role</Label>
-            <Input value={user?.role || 'user'} disabled className="capitalize" />
           </div>
         </CardContent>
       </Card>
