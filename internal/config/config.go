@@ -208,8 +208,12 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if active == 0 && !c.Discovery.Enabled {
-		return errors.New("define at least one enabled switch (in config.yaml or via env) or enable discovery (discovery.enabled: true or DISCOVERY_ENABLED=1)")
+	allowEmpty := strings.EqualFold(os.Getenv("ALLOW_EMPTY_SWITCHES"), "1") ||
+		strings.EqualFold(os.Getenv("ALLOW_EMPTY_SWITCHES"), "true") ||
+		strings.EqualFold(os.Getenv("RUN_MODE"), "api-only")
+
+	if active == 0 && !c.Discovery.Enabled && !allowEmpty {
+		return errors.New("define at least one enabled switch (in config.yaml or via env) or enable discovery (discovery.enabled: true or DISCOVERY_ENABLED=1), or set ALLOW_EMPTY_SWITCHES=1 for API-only mode")
 	}
 
 	if c.Postgres.DSN == "" {

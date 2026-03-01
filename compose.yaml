@@ -49,6 +49,7 @@ services:
       DEMO_MODE: ${DEMO_MODE:-false}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-replace_me_with_base64_32_byte_key}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ALLOW_EMPTY_SWITCHES: ${ALLOW_EMPTY_SWITCHES:-1}
     restart: unless-stopped
 
 volumes:
