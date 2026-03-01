@@ -13,7 +13,7 @@ export function Dashboard() {
     const [alerts, setAlerts] = useState([]);
     const [tenantOverview, setTenantOverview] = useState([]);
     const [selectedTenantId, setSelectedTenantId] = useState('');
-    const [tenantDetails, setTenantDetails] = useState({ devices_down: [], active_alerts: [] });
+    const [tenantDetails, setTenantDetails] = useState({ Devices down: [], Active alerts: [] });
     const [tenantDetailsLoading, setTenantDetailsLoading] = useState(false);
     const [webhookCount, setWebhookCount] = useState(0);
     const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('onboardingDismissed') === '1');
@@ -67,11 +67,11 @@ export function Dashboard() {
     }, []);
 
     const cardData = [
-        { title: 'Total Clients', value: stats.devices, icon: Server, color: 'text-gold', secondary: `${stats.devices} Monitored`, path: '/clients' },
-        { title: 'Switches Online', value: `${stats.up}/${stats.devices}`, icon: ToggleRight, color: stats.down > 0 ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]', secondary: `${stats.down} Offline`, path: '/switches' },
-        { title: 'Rogue Devices', value: 0, icon: AlertCircle, color: 'text-gray-400', secondary: 'No threats', path: '/clients' },
-        { title: 'Loops Detected', value: 0, icon: GitMerge, color: 'text-gray-400', secondary: 'Stable', path: '/topology' },
-        { title: 'Active Alerts', value: stats.alerts, icon: Bug, color: stats.alerts > 0 ? 'text-red-500' : 'text-gold', secondary: 'Current', path: '/alerts' },
+        { title: 'Managed Devices', value: stats.devices, icon: Server, color: 'text-gold', secondary: stats.devices === 0 ? 'No devices onboarded yet' : `${stats.devices} in inventory`, chip: 'Inventory', path: '/clients?status=all' },
+        { title: 'Online Switches', value: `${stats.up}/${stats.devices}`, icon: ToggleRight, color: stats.down > 0 ? 'text-red-500' : 'text-green-400', secondary: stats.down === 0 ? 'All monitored switches are online' : `${stats.down} offline`, chip: 'Live', path: '/switches?status=online' },
+        { title: 'Untrusted Devices', value: 0, icon: AlertCircle, color: 'text-gray-400', secondary: 'No rogue activity detected', chip: 'Risk', path: '/clients?risk=rogue' },
+        { title: 'Loop Events (Open)', value: 0, icon: GitMerge, color: 'text-gray-400', secondary: 'No loop events detected', chip: 'L2 Health', path: '/topology?issue=loop&status=open' },
+        { title: 'Active Incidents', value: stats.alerts, icon: Bug, color: stats.alerts > 0 ? 'text-red-500' : 'text-gold', secondary: stats.alerts === 0 ? 'No active incidents' : 'Action required', chip: 'Incidents', path: '/alerts?status=active' },
     ];
 
     const getSeverityColor = (severity) => {
@@ -98,12 +98,12 @@ export function Dashboard() {
         try {
             const details = await api.getTenantOverviewDetails(tenantId);
             setTenantDetails({
-                devices_down: details.devices_down || [],
-                active_alerts: details.active_alerts || [],
+                Devices down: details.devices_down || [],
+                Active alerts: details.active_alerts || [],
             });
         } catch (err) {
             console.error('failed tenant details', err);
-            if (!silent) setTenantDetails({ devices_down: [], active_alerts: [] });
+            if (!silent) setTenantDetails({ Devices down: [], Active alerts: [] });
         } finally {
             if (!silent) setTenantDetailsLoading(false);
         }
@@ -113,7 +113,7 @@ export function Dashboard() {
         if (!tenantId) return;
         if (selectedTenantId === tenantId) {
             setSelectedTenantId('');
-            setTenantDetails({ devices_down: [], active_alerts: [] });
+            setTenantDetails({ Devices down: [], Active alerts: [] });
             return;
         }
         setSelectedTenantId(tenantId);
@@ -141,6 +141,13 @@ export function Dashboard() {
         setOnboardingDismissed(true);
         localStorage.setItem('onboardingDismissed', '1');
     };
+
+    const freshestPollAt = tenantOverview
+        .map(t => parseAPITimestamp(t.last_poll_at))
+        .filter(Boolean)
+        .sort((a, b) => b - a)[0] || null;
+    const pollFreshnessText = freshestPollAt ? formatDistanceToNow(freshestPollAt, { addSuffix: true }) : 'not started';
+    const hasPollData = Boolean(freshestPollAt);
 
     if (loading) {
         return (
@@ -173,6 +180,18 @@ export function Dashboard() {
             animate="show"
             className="space-y-8"
         >
+            <motion.div variants={itemVariants} className="glass-panel p-4 rounded-2xl border border-white/10">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2 py-1 rounded-lg border border-green-500/30 bg-green-500/10 text-green-300">API: Healthy</span>
+                    <span className={clsx('px-2 py-1 rounded-lg border', hasPollData ? 'border-blue-500/30 bg-blue-500/10 text-blue-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300')}>
+                        Poll freshness: {pollFreshnessText}
+                    </span>
+                    <span className={clsx('px-2 py-1 rounded-lg border', webhookCount > 0 ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300')}>
+                        Alert pipeline: {webhookCount > 0 ? `${webhookCount} destination(s)` : 'not configured'}
+                    </span>
+                </div>
+            </motion.div>
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {cardData.map((card, i) => (
@@ -182,8 +201,8 @@ export function Dashboard() {
                             className="block h-full"
                         >
                             <motion.div
-                                whileHover={{ y: -5, boxShadow: "0 10px 30px -10px rgba(212, 175, 55, 0.15)" }}
-                                className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-gold/30 transition duration-500 h-full"
+                                whileHover={{ y: -5, boxShadow: "0 10px 30px -10px rgba(212, 175, 55, 0.12)" }}
+                                className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-gold/30 focus-within:ring-2 focus-within:ring-gold/50 transition duration-500 h-full"
                             >
                                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-gold/10 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition duration-700 blur-xl"></div>
 
@@ -191,7 +210,7 @@ export function Dashboard() {
                                     <div className={clsx("p-2 rounded-lg bg-white/5 ring-1 ring-white/10 group-hover:ring-gold/20 transition duration-500", card.color.includes('text-gold') && "shadow-[0_0_15px_rgba(212,175,55,0.1)]")}>
                                         <card.icon className={clsx("w-6 h-6", card.color)} />
                                     </div>
-                                    <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-full bg-white/5 text-gray-400 border border-white/5 uppercase">Metric</span>
+                                    <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10 uppercase">{card.chip}</span>
                                 </div>
 
                                 <div className="mt-6 relative z-10">
@@ -211,22 +230,23 @@ export function Dashboard() {
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2 text-white font-semibold">
                             <Sparkles className="w-5 h-5 text-gold" />
-                            Quick onboarding ({completedSteps}/2)
+                            Get production-ready in 2 steps
                         </div>
-                        <button onClick={dismissOnboarding} className="text-xs text-gray-400 hover:text-white">Dismiss</button>
+                        <button onClick={dismissOnboarding} className="text-xs text-gray-400 hover:text-white">Skip for now</button>
                     </div>
+                    <div className="text-xs text-gray-400 mb-3">Estimated time: 3 minutes</div>
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
                         <div className="p-3 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <CheckCircle2 className={`w-4 h-4 ${onboarding.hasDevices ? 'text-green-400' : 'text-gray-500'}`} />
-                                <span>Add your first device</span>
+                                <span>Add your first device to start SLA tracking</span>
                             </div>
                             {!onboarding.hasDevices && <Link className="text-gold" to="/devices/new">Go</Link>}
                         </div>
                         <div className="p-3 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <CheckCircle2 className={`w-4 h-4 ${onboarding.hasAlertsDestination ? 'text-green-400' : 'text-gray-500'}`} />
-                                <span>Configure alert webhook</span>
+                                <span>Connect an alert destination for real-time incidents</span>
                             </div>
                             {!onboarding.hasAlertsDestination && <Link className="text-gold" to="/settings?tab=alerts">Go</Link>}
                         </div>
@@ -247,9 +267,9 @@ export function Dashboard() {
                                     <span className={clsx('px-2 py-0.5 rounded text-[10px] uppercase border', t.status_color === 'red' ? 'text-red-400 border-red-500/30 bg-red-500/10' : t.status_color === 'yellow' ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-green-400 border-green-500/30 bg-green-500/10')}>{t.status_color}</span>
                                 </div>
                                 <div className="mt-2 text-xs text-gray-400 space-y-1">
-                                    <div>devices_down: <span className="text-white">{t.devices_down}</span></div>
-                                    <div>active_alerts: <span className="text-white">{t.active_alerts}</span></div>
-                                    <div>last_poll_at: <span className="text-white">{t.last_poll_at ? formatDistanceToNow(parseAPITimestamp(t.last_poll_at), { addSuffix: true }) : 'n/a'}</span></div>
+                                    <div>Devices down: <span className="text-white">{t.devices_down}</span></div>
+                                    <div>Active alerts: <span className="text-white">{t.active_alerts}</span></div>
+                                    <div>Last poll: <span className="text-white">{t.last_poll_at ? formatDistanceToNow(parseAPITimestamp(t.last_poll_at), { addSuffix: true }) : 'not started'}</span></div>
                                 </div>
                             </button>
                         ))}
@@ -271,9 +291,9 @@ export function Dashboard() {
                                         ) : tenantDetails.devices_down.map(d => (
                                             <div key={d.device_id} className="p-2 rounded border border-white/10 bg-white/5 text-xs">
                                                 <div className="text-white font-medium">{d.device_name || `Device #${d.device_id}`}</div>
-                                                <div className="text-gray-400">{d.device_ip || 'n/a'}</div>
-                                                <div className="text-gray-500">down since: {d.down_since ? formatDistanceToNow(parseAPITimestamp(d.down_since), { addSuffix: true }) : 'n/a'}</div>
-                                                <div className="text-gray-500">last success: {d.last_success_at ? formatDistanceToNow(parseAPITimestamp(d.last_success_at), { addSuffix: true }) : 'n/a'}</div>
+                                                <div className="text-gray-400">{d.device_ip || 'not started'}</div>
+                                                <div className="text-gray-500">down since: {d.down_since ? formatDistanceToNow(parseAPITimestamp(d.down_since), { addSuffix: true }) : 'not started'}</div>
+                                                <div className="text-gray-500">last success: {d.last_success_at ? formatDistanceToNow(parseAPITimestamp(d.last_success_at), { addSuffix: true }) : 'not started'}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -286,8 +306,8 @@ export function Dashboard() {
                                         ) : tenantDetails.active_alerts.map(a => (
                                             <div key={a.id} className="p-2 rounded border border-red-500/20 bg-red-500/5 text-xs">
                                                 <div className="text-red-300 font-medium">{a.title || 'Device unreachable'}</div>
-                                                <div className="text-gray-300">{a.device_name || `Device #${a.device_id}`} • {a.device_ip || 'n/a'}</div>
-                                                <div className="text-gray-500">down since: {a.triggered_at ? formatDistanceToNow(parseAPITimestamp(a.triggered_at), { addSuffix: true }) : 'n/a'}</div>
+                                                <div className="text-gray-300">{a.device_name || `Device #${a.device_id}`} • {a.device_ip || 'not started'}</div>
+                                                <div className="text-gray-500">down since: {a.triggered_at ? formatDistanceToNow(parseAPITimestamp(a.triggered_at), { addSuffix: true }) : 'not started'}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -359,7 +379,7 @@ export function Dashboard() {
                         ))}
                         {topTalkers.length === 0 && (
                             <div className="text-center text-gray-500 py-10 italic flex flex-col items-center space-y-3">
-                                <div>No traffic data available</div>
+                                <div>No traffic data yet — connect a switch to start throughput insights.</div>
                                 <Link to="/switches" className="text-xs text-gold hover:text-white transition border border-gold/30 px-3 py-1 rounded-full hover:shadow-[0_0_15px_rgba(212,175,55,0.2)]">Register Switches to see traffic</Link>
                             </div>
                         )}
@@ -385,7 +405,7 @@ export function Dashboard() {
                                 <div className="p-4 rounded-full bg-gold/5 mb-4 border border-gold/10 shadow-[0_0_15px_rgba(212,175,55,0.05)]">
                                     <Bug className="w-8 h-8 text-gold/40" />
                                 </div>
-                                <span className="text-sm font-medium text-gray-400">All systems operational</span>
+                                <span className="text-sm font-medium text-gray-400">No active incidents — all monitored systems operational</span>
                                 <Link to="/alerts" className="text-[10px] uppercase tracking-widest text-gold hover:text-white transition mt-4 border border-gold/20 hover:bg-gold/10 rounded-full px-4 py-1.5">
                                     View History
                                 </Link>
