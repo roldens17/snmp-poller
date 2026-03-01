@@ -359,63 +359,39 @@ export const reportsAPI = {
 
     return {
       summary: {
-        devices: {
-          total,
-          up,
-          down,
-          availability,
-        },
-        incidents: {
-          open: row?.active_alerts || 0,
-          total: row?.active_alerts || 0,
-        },
+        devices: { total, up, down, availability },
+        incidents: { open: row?.active_alerts || 0, total: row?.active_alerts || 0 },
       },
     };
   },
 
-  async getUptimeReport(_days = 30, deviceId?: string) {
-    const [devicesRes, alertsRes] = await Promise.all([
-      apiRequest('/devices'),
-      apiRequest('/api/alerts?status=active&limit=500'),
-    ]);
+  async getSLA(windowDays = 30) {
+    return apiRequest(`/reports/sla?window=${windowDays}d`);
+  },
 
-    const alertsByDevice = new Map<number, number>();
-    for (const alert of alertsRes?.alerts || []) {
-      alertsByDevice.set(alert.device_id, (alertsByDevice.get(alert.device_id) || 0) + 1);
-    }
+  async getIncidents(limit = 200) {
+    return apiRequest(`/reports/incidents?limit=${limit}`);
+  },
 
-    let devices = (devicesRes?.devices || []).map(mapDevice);
-    if (deviceId) {
-      devices = devices.filter((d: any) => String(d.id) === String(deviceId));
-    }
+  downloadSLAcsv() {
+    window.open(`${API_BASE}/reports/sla.csv`, '_blank');
+  },
 
-    const report = devices.map((d: any) => {
-      const activeAlerts = alertsByDevice.get(d.id) || 0;
-      const failedPolls = activeAlerts > 0 ? activeAlerts * 3 : 0;
-      const successfulPolls = Math.max(100 - failedPolls, 0);
-      const totalPolls = successfulPolls + failedPolls;
-      const uptime = totalPolls > 0 ? ((successfulPolls / totalPolls) * 100).toFixed(2) : '0.00';
-      return {
-        deviceId: String(d.id),
-        deviceName: d.name,
-        ipAddress: d.ipAddress,
-        totalPolls,
-        successfulPolls,
-        failedPolls,
-        uptimePercentage: uptime,
-        currentStatus: d.status === 'up' ? 'up' : 'down',
-        lastPolled: d.lastPolled,
-      };
-    });
+  downloadIncidentsCSV() {
+    window.open(`${API_BASE}/reports/incidents.csv`, '_blank');
+  },
 
+  async getUptimeReport(days = 30, _deviceId?: string) {
+    const sla = await this.getSLA(days);
+    const incidents = await this.getIncidents(500);
     return {
-      report,
-      period: { days: _days },
+      report: incidents?.incidents || [],
+      period: { days, startDate: new Date(Date.now() - days * 86400000).toISOString() },
       generatedAt: new Date().toISOString(),
+      sla: sla?.report,
     };
   },
 };
-
 
 // Invite API
 export const inviteAPI = {

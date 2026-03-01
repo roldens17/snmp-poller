@@ -347,3 +347,64 @@ func (s *HTTPServer) handleTopology(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"nodes": nodes, "edges": edges})
 }
+
+
+func (s *HTTPServer) handleReportSLA(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	window := 30
+	if w := strings.TrimSpace(c.Query("window")); w != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSuffix(w, "d")); err == nil && parsed > 0 {
+			window = parsed
+		}
+	}
+	report, err := s.store.ReportSLA(c.Request.Context(), tenantID, window)
+	if err != nil { s.respondErr(c, err); return }
+	c.JSON(http.StatusOK, gin.H{"report": report})
+}
+
+func (s *HTTPServer) handleReportIncidents(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	to := time.Now().UTC()
+	from := to.Add(-30 * 24 * time.Hour)
+	if v := strings.TrimSpace(c.Query("from")); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil { from = t }
+	}
+	if v := strings.TrimSpace(c.Query("to")); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil { to = t }
+	}
+	limit := 200
+	if l := strings.TrimSpace(c.Query("limit")); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil { limit = parsed }
+	}
+	rows, err := s.store.ReportIncidents(c.Request.Context(), tenantID, from, to, limit)
+	if err != nil { s.respondErr(c, err); return }
+	c.JSON(http.StatusOK, gin.H{"incidents": rows, "from": from, "to": to})
+}
+
+func (s *HTTPServer) handleReportSLAcsv(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	report, err := s.store.ReportSLA(c.Request.Context(), tenantID, 30)
+	if err != nil { s.respondErr(c, err); return }
+	csv := "window_days,total_minutes,downtime_minutes,uptime_percent,incidents_count,avg_resolve_minutes,worst_incident_minutes,monitored_device_count\n"
+	csv += fmt.Sprintf("%d,%d,%d,%.4f,%d,%.2f,%d,%d\n", report.WindowDays, report.TotalMinutes, report.DowntimeMinutes, report.UptimePercent, report.IncidentsCount, report.AvgResolveMinutes, report.WorstIncidentMinutes, report.MonitoredDeviceCount)
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", "attachment; filename=sla-report.csv")
+	c.String(http.StatusOK, csv)
+}
+
+func (s *HTTPServer) handleReportIncidentsCSV(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	to := time.Now().UTC()
+	from := to.Add(-30 * 24 * time.Hour)
+	rows, err := s.store.ReportIncidents(c.Request.Context(), tenantID, from, to, 1000)
+	if err != nil { s.respondErr(c, err); return }
+	csv := "alert_id,device_id,device_name,device_ip,severity,status,triggered_at,resolved_at,duration_minutes\n"
+	for _, r := range rows {
+		resolved := ""
+		if r.ResolvedAt != nil { resolved = r.ResolvedAt.UTC().Format(time.RFC3339) }
+		csv += fmt.Sprintf("%d,%d,%q,%q,%s,%s,%s,%s,%d\n", r.AlertID, r.DeviceID, r.DeviceName, r.DeviceIP, r.Severity, r.Status, r.TriggeredAt.UTC().Format(time.RFC3339), resolved, r.DurationMinute)
+	}
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", "attachment; filename=incidents-report.csv")
+	c.String(http.StatusOK, csv)
+}
