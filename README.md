@@ -146,3 +146,20 @@ curl -b cookies.txt -X POST http://localhost:8081/tenants/active \
 # List Devices (scoped to tenant)
 curl -b cookies.txt http://localhost:8081/devices
 ```
+
+
+## Frontend Migration Notes (App Shell + Legacy Bridge)
+
+The frontend now uses a new app shell under `web/src/app`.
+
+Legacy pages are preserved under `web/src/legacy` and exposed through `/snmp/*` bridge routes:
+- `/snmp/clients`
+- `/snmp/switches`
+- `/snmp/topology`
+- `/snmp/alerts`
+- `/snmp/reports`
+- `/snmp/settings`
+- `/snmp/devices/new`
+- `/snmp/devices/:id`
+
+This bridge is temporary to avoid losing Day 1 functionality while migrating feature-by-feature into the new shell.
