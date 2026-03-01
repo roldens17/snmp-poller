@@ -13,7 +13,7 @@ export function Dashboard() {
     const [alerts, setAlerts] = useState([]);
     const [tenantOverview, setTenantOverview] = useState([]);
     const [selectedTenantId, setSelectedTenantId] = useState('');
-    const [tenantDetails, setTenantDetails] = useState({ Devices down: [], Active alerts: [] });
+    const [tenantDetails, setTenantDetails] = useState({ devices_down: [], active_alerts: [] });
     const [tenantDetailsLoading, setTenantDetailsLoading] = useState(false);
     const [webhookCount, setWebhookCount] = useState(0);
     const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('onboardingDismissed') === '1');
@@ -103,7 +103,7 @@ export function Dashboard() {
             });
         } catch (err) {
             console.error('failed tenant details', err);
-            if (!silent) setTenantDetails({ Devices down: [], Active alerts: [] });
+            if (!silent) setTenantDetails({ devices_down: [], active_alerts: [] });
         } finally {
             if (!silent) setTenantDetailsLoading(false);
         }
@@ -113,7 +113,7 @@ export function Dashboard() {
         if (!tenantId) return;
         if (selectedTenantId === tenantId) {
             setSelectedTenantId('');
-            setTenantDetails({ Devices down: [], Active alerts: [] });
+            setTenantDetails({ devices_down: [], active_alerts: [] });
             return;
         }
         setSelectedTenantId(tenantId);
