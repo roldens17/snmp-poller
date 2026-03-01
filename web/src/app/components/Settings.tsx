@@ -95,12 +95,24 @@ export function Settings() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-3xl font-bold text-midnight-text-primary">Settings</h1>
-        <p className="text-midnight-text-secondary mt-1">Manage your account, invites, and monitoring preferences</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-midnight-text-primary">Settings</h1>
+          <p className="text-midnight-text-secondary mt-1">Manage your account, invites, and monitoring preferences</p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            document.getElementById('invite-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+          className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600"
+        >
+          <Send className="w-4 h-4 mr-2" />
+          Invite User
+        </Button>
       </div>
 
-      <Card className="bg-midnight-card border border-midnight-border">
+      <Card id="invite-section" className="bg-midnight-card border border-midnight-border">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Send className="w-5 h-5" />
