@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { topologyAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -9,6 +10,7 @@ export function Topology() {
   const [edges, setEdges] = useState<any[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all'|'up'|'down'>('all');
+  const [selected, setSelected] = useState<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -57,7 +59,7 @@ export function Topology() {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filtered.map((n) => (
-                <div key={`${n.device_id}`} className="p-3 rounded-lg border border-midnight-border bg-midnight-bg">
+                <button key={`${n.device_id}`} onClick={() => setSelected(n)} className="p-3 rounded-lg border border-midnight-border bg-midnight-bg text-left hover:border-midnight-accent/40 transition">
                   <div className="flex items-center justify-between">
                     <div className="font-medium text-midnight-text-primary truncate">{n.label || `Device ${n.device_id}`}</div>
                     {n.active_alerts > 0 ? <AlertTriangle className="w-4 h-4 text-midnight-status-critical" /> : null}
@@ -68,12 +70,31 @@ export function Topology() {
                       {n.active_alerts > 0 ? `alerts: ${n.active_alerts}` : 'healthy'}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+
+      {selected && (
+        <Card className="bg-midnight-card border border-midnight-border">
+          <CardHeader>
+            <CardTitle className="text-midnight-text-primary">Device details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div><span className="text-midnight-text-secondary">Name:</span> <span className="text-midnight-text-primary">{selected.label || `Device ${selected.device_id}`}</span></div>
+            <div><span className="text-midnight-text-secondary">IP:</span> <span className="text-midnight-text-primary">{selected.ip || 'n/a'}</span></div>
+            <div><span className="text-midnight-text-secondary">Status:</span> <span className="text-midnight-text-primary">{selected.status || 'unknown'}</span></div>
+            <div><span className="text-midnight-text-secondary">Active alerts:</span> <span className="text-midnight-text-primary">{selected.active_alerts || 0}</span></div>
+            <div className="pt-2 flex gap-2">
+              <Link to={`/devices/${selected.device_id}`} className="px-3 py-1.5 rounded-md border border-midnight-border bg-midnight-bg hover:bg-midnight-border text-midnight-text-primary">Open device</Link>
+              <button onClick={() => setSelected(null)} className="px-3 py-1.5 rounded-md border border-midnight-border text-midnight-text-secondary hover:text-midnight-text-primary">Close</button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
