@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/smtp"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +15,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
+
+
+func sendSMTPReportEmail(toEmail, subject, body string) error {
+	host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
+	port := strings.TrimSpace(os.Getenv("SMTP_PORT"))
+	user := strings.TrimSpace(os.Getenv("SMTP_USER"))
+	pass := os.Getenv("SMTP_PASS")
+	from := strings.TrimSpace(os.Getenv("SMTP_FROM"))
+	if host == "" || port == "" || from == "" {
+		return errors.New("smtp not configured")
+	}
+	addr := host + ":" + port
+	msg := "From: " + from + "\r\n" +
+		"To: " + toEmail + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\n\r\n" + body + "\r\n"
+	var auth smtp.Auth
+	if user != "" {
+		auth = smtp.PlainAuth("", user, pass, host)
+	}
+	return smtp.SendMail(addr, auth, from, []string{toEmail}, []byte(msg))
+}
 
 func randomToken(n int) (string, error) {
 	b := make([]byte, n)
@@ -490,9 +515,26 @@ func (s *HTTPServer) handleSendReportNow(c *gin.Context) {
 	}
 	to := time.Now().UTC()
 	from := to.Add(-30 * 24 * time.Hour)
+	sla, _ := s.store.ReportSLA(c.Request.Context(), tenantID, 30)
+		subject := fmt.Sprintf("SLA Report (%s)", to.Format("2006-01-02"))
+	body := "SNMP SaaS SLA Report\n\n"
+	if sla != nil {
+		body += fmt.Sprintf("Uptime: %.2f%%\nTarget: %.2f%%\nIncidents: %d\nAvg MTTR: %.1f minutes\n", sla.UptimePercent, sla.SLATargetPercent, sla.IncidentsCount, sla.AvgResolveMinutes)
+	}
+	body += fmt.Sprintf("Window: %s to %s\n", from.Format(time.RFC3339), to.Format(time.RFC3339))
+
+	sent := 0
+	failed := 0
 	for _, r := range rows {
 		if !r.Enabled { continue }
-		_ = s.store.AddReportDeliveryHistory(c.Request.Context(), tenantID, r.Email, "sla_monthly", "queued", from.Format(time.RFC3339), to.Format(time.RFC3339), "")
+		err := sendSMTPReportEmail(r.Email, subject, body)
+		if err != nil {
+			failed++
+			_ = s.store.AddReportDeliveryHistory(c.Request.Context(), tenantID, r.Email, "sla_monthly", "failed", from.Format(time.RFC3339), to.Format(time.RFC3339), err.Error())
+			continue
+		}
+		sent++
+		_ = s.store.AddReportDeliveryHistory(c.Request.Context(), tenantID, r.Email, "sla_monthly", "sent", from.Format(time.RFC3339), to.Format(time.RFC3339), "")
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "queued": true})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "sent": sent, "failed": failed})
 }
