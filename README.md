@@ -163,3 +163,14 @@ Legacy pages are preserved under `web/src/legacy` and exposed through `/snmp/*` 
 - `/snmp/devices/:id`
 
 This bridge is temporary to avoid losing Day 1 functionality while migrating feature-by-feature into the new shell.
+
+
+## Quality checks
+
+Run full local checks before pushing:
+
+```bash
+./scripts/check.sh
+```
+
+For current route/migration status, see `docs/current-state.md`.
