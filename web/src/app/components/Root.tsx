@@ -32,6 +32,14 @@ export function Root() {
     checkSession();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (location.pathname.startsWith('/snmp/') && !params.has('legacy')) {
+      navigate('/', { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
+
   async function checkSession() {
     try {
       const session = await authAPI.getSession();
@@ -80,7 +88,7 @@ export function Root() {
     { name: 'Webhooks', href: '/webhooks', icon: Webhook },
     { name: 'Reports', href: '/reports', icon: FileText },
     { name: 'Settings', href: '/settings', icon: Settings },
-    { name: 'SNMP Console', href: '/snmp/switches', icon: Network },
+    { name: 'SNMP Console', href: '/snmp/switches?legacy=1', icon: Network },
   ];
 
   const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
