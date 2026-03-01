@@ -178,9 +178,9 @@ export function Dashboard() {
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="space-y-8"
+            className="space-y-6"
         >
-            <motion.div variants={itemVariants} className="glass-panel p-4 rounded-2xl border border-white/10">
+            <motion.div variants={itemVariants} className="glass-panel p-4 rounded-xl border border-white/10">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="px-2 py-1 rounded-lg border border-green-500/30 bg-green-500/10 text-green-300">API: Healthy</span>
                     <span className={clsx('px-2 py-1 rounded-lg border', hasPollData ? 'border-blue-500/30 bg-blue-500/10 text-blue-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300')}>
@@ -202,7 +202,7 @@ export function Dashboard() {
                         >
                             <motion.div
                                 whileHover={{ y: -5, boxShadow: "0 10px 30px -10px rgba(212, 175, 55, 0.12)" }}
-                                className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-gold/30 focus-within:ring-2 focus-within:ring-gold/50 transition duration-500 h-full"
+                                className="glass-panel p-6 rounded-xl relative overflow-hidden group hover:border-gold/30 focus-within:ring-2 focus-within:ring-gold/50 transition duration-500 h-full"
                             >
                                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-gold/10 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition duration-700 blur-xl"></div>
 
@@ -226,7 +226,7 @@ export function Dashboard() {
             </div>
 
             {showOnboarding && (
-                <motion.div variants={itemVariants} className="glass-panel p-6 rounded-2xl border border-gold/20">
+                <motion.div variants={itemVariants} className="glass-panel p-6 rounded-xl border border-gold/20">
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2 text-white font-semibold">
                             <Sparkles className="w-5 h-5 text-gold" />
@@ -254,7 +254,7 @@ export function Dashboard() {
                 </motion.div>
             )}
 
-            <motion.div variants={itemVariants} className="glass-panel p-6 rounded-2xl">
+            <motion.div variants={itemVariants} className="glass-panel p-6 rounded-xl">
                 <h2 className="text-lg font-bold mb-4 text-white">Tenant Overview</h2>
                 {tenantOverview.length === 0 ? (
                     <div className="text-sm text-gray-500">No tenant overview data yet.</div>
@@ -319,9 +319,9 @@ export function Dashboard() {
             </motion.div>
 
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Top Talkers */}
-                <motion.div variants={itemVariants} className="lg:col-span-2 glass-panel p-8 rounded-2xl">
+                <motion.div variants={itemVariants} className="lg:col-span-2 glass-panel p-6 rounded-xl">
                     <h2 className="text-xl font-bold mb-8 flex items-center text-white">
                         <div className="p-2 rounded-lg bg-gold/10 mr-3 border border-gold/10">
                             <BarChart2 className="w-5 h-5 text-gold" />
@@ -387,7 +387,7 @@ export function Dashboard() {
                 </motion.div>
 
                 {/* Alerts */}
-                <motion.div variants={itemVariants} className="lg:col-span-1 glass-panel p-0 rounded-2xl overflow-hidden flex flex-col">
+                <motion.div variants={itemVariants} className="lg:col-span-1 glass-panel p-0 rounded-xl overflow-hidden flex flex-col">
                     <div className="p-6 border-b border-white/5 bg-white/[0.02]">
                         <h2 className="text-lg font-bold flex justify-between items-center text-white">
                             <span>Recent Alerts</span>

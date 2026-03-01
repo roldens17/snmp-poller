@@ -31,7 +31,7 @@ export function Reports() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col h-full space-y-8"
+            className="flex flex-col h-full space-y-6"
         >
             <div className="flex flex-col md:flex-row justify-between items-end border-b border-white/5 pb-6 gap-3">
                 <div>
@@ -59,7 +59,7 @@ export function Reports() {
                         variants={itemVariants}
                         key={i}
                         whileHover={{ y: -4, boxShadow: "0 10px 24px -10px rgba(0,0,0,0.45)" }}
-                        className="glass-panel-premium p-6 rounded-2xl flex flex-col justify-between group border border-white/5 hover:border-gold/25 transition duration-300 relative overflow-hidden"
+                        className="glass-panel-premium p-6 rounded-xl flex flex-col justify-between group border border-white/5 hover:border-gold/25 transition duration-300 relative overflow-hidden"
                     >
                         <div className="absolute top-0 right-0 -mt-2 -mr-2 w-20 h-20 bg-gradient-to-br from-gold/10 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition duration-500 blur-xl"></div>
 
@@ -70,7 +70,7 @@ export function Reports() {
                             <h3 className="text-lg font-bold mb-3 text-gray-100 group-hover:text-white">{r.title}</h3>
                             <p className="text-sm text-gray-400 mb-6 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5 h-24">{r.description}</p>
                         </div>
-                        <button className="relative z-10 w-full bg-white/5 hover:bg-gold hover:text-black text-gray-300 font-bold py-3 rounded-xl transition duration-300 flex items-center justify-center border border-white/10 hover:border-gold shadow-lg group-hover:shadow-gold/20 focus-visible:ring-2 focus-visible:ring-gold/50">
+                        <button className="relative z-10 w-full bg-white/5 hover:bg-gold hover:text-black text-gray-300 font-bold py-3 rounded-xl transition duration-300 flex items-center justify-center border border-white/10 hover:border-gold  group-hover:shadow-gold/20 focus-visible:ring-2 focus-visible:ring-gold/50">
                             <Download className="w-4 h-4 mr-2" />
                             <span>{r.cta}</span>
                         </button>

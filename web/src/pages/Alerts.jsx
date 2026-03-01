@@ -50,7 +50,7 @@ export function Alerts() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="glass-panel-premium rounded-2xl shadow-xl border border-white/5 h-full flex flex-col"
+            className="glass-panel-premium rounded-xl  border border-white/5 h-full flex flex-col"
         >
             <div className="flex flex-col md:flex-row justify-between items-center p-6 border-b border-white/5 bg-white/5">
                 <h2 className="text-xl font-bold flex items-center gap-3">
@@ -119,7 +119,7 @@ export function Alerts() {
                                 onClick={() => a.device_id && navigate(`/devices/${a.device_id}`)}
                             >
                                 <div className="p-4 pl-6 col-span-2">
-                                    <div className={clsx("w-8 h-8 rounded-lg flex items-center justify-center shadow-lg", getSeverityColor(a.severity))}>
+                                    <div className={clsx("w-8 h-8 rounded-lg flex items-center justify-center ", getSeverityColor(a.severity))}>
                                         {a.severity === 'critical' ? <Octagon className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                                     </div>
                                 </div>
