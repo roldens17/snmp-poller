@@ -408,3 +408,21 @@ func (s *HTTPServer) handleReportIncidentsCSV(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment; filename=incidents-report.csv")
 	c.String(http.StatusOK, csv)
 }
+
+
+func (s *HTTPServer) handleSetSLATarget(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	var req struct { Target float64 `json:"target"` }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	if req.Target < 90 || req.Target > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target must be between 90 and 100"})
+		return
+	}
+	if err := s.store.UpdateSLATarget(c.Request.Context(), tenantID, req.Target); err != nil {
+		s.respondErr(c, err); return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

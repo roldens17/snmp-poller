@@ -219,6 +219,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/reports/incidents", s.handleReportIncidents)
 	protected.GET("/reports/sla.csv", s.handleReportSLAcsv)
 	protected.GET("/reports/incidents.csv", s.handleReportIncidentsCSV)
+	protected.PATCH("/reports/sla-target", s.handleSetSLATarget)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
 			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))

@@ -11,6 +11,8 @@ export function Reports() {
   const [loading, setLoading] = useState(false);
   const [sla, setSla] = useState<any>(null);
   const [incidents, setIncidents] = useState<any[]>([]);
+  const [slaTarget, setSlaTarget] = useState('99.9');
+  const [savingTarget, setSavingTarget] = useState(false);
 
   async function generate() {
     setLoading(true);
@@ -20,6 +22,7 @@ export function Reports() {
         reportsAPI.getIncidents(500),
       ]);
       setSla(slaRes?.report || null);
+      if (slaRes?.report?.sla_target_percent) setSlaTarget(String(slaRes.report.sla_target_percent));
       setIncidents(incRes?.incidents || []);
       toast.success('SLA report generated');
     } catch (e: any) {
@@ -27,6 +30,45 @@ export function Reports() {
     } finally {
       setLoading(false);
     }
+  }
+
+
+  async function saveTarget() {
+    setSavingTarget(true);
+    try {
+      await reportsAPI.setSLATarget(Number(slaTarget));
+      toast.success('SLA target updated');
+      await generate();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save target');
+    } finally {
+      setSavingTarget(false);
+    }
+  }
+
+  function emailReport() {
+    if (!sla) return;
+    const subject = encodeURIComponent(`SLA Report (${days}d)`);
+    const body = encodeURIComponent(
+      `SLA Summary
+` +
+      `Uptime: ${Number(sla.uptime_percent).toFixed(2)}%
+` +
+      `Target: ${Number(sla.sla_target_percent || 99.9).toFixed(2)}%
+` +
+      `Incidents: ${sla.incidents_count}
+` +
+      `Avg MTTR: ${Number(sla.avg_resolve_minutes).toFixed(1)}m
+
+` +
+      `Export links:
+` +
+      `${window.location.origin}/api/reports/sla.csv
+` +
+      `${window.location.origin}/api/reports/incidents.csv
+`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   }
 
   return (
@@ -39,7 +81,7 @@ export function Reports() {
       <Card className="bg-midnight-card border border-midnight-border">
         <CardHeader><CardTitle>SLA Report (Billable)</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-3 items-end">
+          <div className="grid md:grid-cols-4 gap-3 items-end">
             <div>
               <label className="text-sm text-midnight-text-secondary">Window</label>
               <Select value={days} onValueChange={setDays}>
@@ -53,10 +95,18 @@ export function Reports() {
               </Select>
             </div>
             <Button onClick={generate} disabled={loading} className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600">{loading ? 'Generating...' : 'Generate'}</Button>
+            <div className="space-y-2">
+              <label className="text-sm text-midnight-text-secondary">SLA Target %</label>
+              <div className="flex gap-2">
+                <input className="h-10 w-24 rounded-md border border-midnight-border bg-midnight-bg px-2 text-sm" value={slaTarget} onChange={(e)=>setSlaTarget(e.target.value)} />
+                <Button variant="outline" onClick={saveTarget} disabled={savingTarget}>{savingTarget ? 'Saving...' : 'Save'}</Button>
+              </div>
+            </div>
             <div className="flex gap-2 flex-wrap">
               <Button variant="outline" onClick={() => reportsAPI.downloadSLAcsv()}><Download className="w-4 h-4 mr-1" />SLA CSV</Button>
               <Button variant="outline" onClick={() => reportsAPI.downloadIncidentsCSV()}><Download className="w-4 h-4 mr-1" />Incidents CSV</Button>
               <Button variant="outline" onClick={() => window.open(`/reports/print?days=${days}`, '_blank')}><FileDown className="w-4 h-4 mr-1" />Print/PDF</Button>
+              <Button variant="outline" onClick={emailReport}>Email this report</Button>
             </div>
           </div>
         </CardContent>
@@ -67,7 +117,7 @@ export function Reports() {
           <CardHeader><CardTitle>Tenant SLA Summary</CardTitle></CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-4 gap-3">
-              <div className="p-3 rounded border border-midnight-border bg-midnight-bg"><div className="text-xs text-midnight-text-secondary">30d Uptime</div><div className="text-2xl font-bold text-midnight-text-primary">{Number(sla.uptime_percent).toFixed(2)}%</div></div>
+              <div className="p-3 rounded border border-midnight-border bg-midnight-bg"><div className="text-xs text-midnight-text-secondary">30d Uptime</div><div className="text-2xl font-bold text-midnight-text-primary">{Number(sla.uptime_percent).toFixed(2)}%</div><div className={`text-xs mt-1 ${sla.sla_breached ? 'text-red-400' : 'text-green-400'}`}>{sla.sla_breached ? `Below target ${Number(sla.sla_target_percent).toFixed(2)}%` : `Meets target ${Number(sla.sla_target_percent).toFixed(2)}%`}</div></div>
               <div className="p-3 rounded border border-midnight-border bg-midnight-bg"><div className="text-xs text-midnight-text-secondary">Incidents</div><div className="text-2xl font-bold text-midnight-text-primary">{sla.incidents_count}</div></div>
               <div className="p-3 rounded border border-midnight-border bg-midnight-bg"><div className="text-xs text-midnight-text-secondary">Avg MTTR</div><div className="text-2xl font-bold text-midnight-text-primary">{Number(sla.avg_resolve_minutes).toFixed(1)}m</div></div>
               <div className="p-3 rounded border border-midnight-border bg-midnight-bg"><div className="text-xs text-midnight-text-secondary">Worst Incident</div><div className="text-2xl font-bold text-midnight-text-primary">{sla.worst_incident_minutes}m</div></div>

@@ -6,6 +6,9 @@ import (
 )
 
 type SLAReport struct {
+	SLATargetPercent        float64 `json:"sla_target_percent"`
+	SLABreached             bool    `json:"sla_breached"`
+	DeficitMinutes          int64   `json:"deficit_minutes"`
 	WindowDays              int     `json:"window_days"`
 	TotalMinutes            int64   `json:"total_minutes"`
 	DowntimeMinutes         int64   `json:"downtime_minutes"`
@@ -65,8 +68,11 @@ func (s *Store) ReportSLA(ctx context.Context, tenantID string, windowDays int) 
 
 	var deviceCount int64
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM devices WHERE tenant_id=$1::uuid`, tenantID).Scan(&deviceCount); err != nil { return nil, err }
+
+	var slaTarget float64
+	if err := s.pool.QueryRow(ctx, `SELECT COALESCE(sla_target_percent, 99.90) FROM tenants WHERE id=$1::uuid`, tenantID).Scan(&slaTarget); err != nil { return nil, err }
 	if deviceCount == 0 {
-		return &SLAReport{WindowDays: windowDays, TotalMinutes: int64(windowDays * 24 * 60), UptimePercent: 100, MonitoredDeviceCount: 0}, nil
+		return &SLAReport{WindowDays: windowDays, TotalMinutes: int64(windowDays * 24 * 60), UptimePercent: 100, MonitoredDeviceCount: 0, SLATargetPercent: slaTarget, SLABreached: false, DeficitMinutes: 0}, nil
 	}
 
 	var incidents int64
@@ -94,7 +100,18 @@ func (s *Store) ReportSLA(ctx context.Context, tenantID string, windowDays int) 
 		if uptime < 0 { uptime = 0 }
 	}
 
+	deficitMinutes := int64(0)
+	slaBreached := uptime < slaTarget
+	if slaBreached {
+		allowedDowntime := (100.0 - slaTarget) / 100.0 * denom
+		over := downtime - allowedDowntime
+		if over > 0 { deficitMinutes = int64(over) }
+	}
+
 	return &SLAReport{
+		SLATargetPercent:     slaTarget,
+		SLABreached:          slaBreached,
+		DeficitMinutes:       deficitMinutes,
 		WindowDays:           windowDays,
 		TotalMinutes:         totalMinutes,
 		DowntimeMinutes:      int64(downtime),
@@ -104,4 +121,10 @@ func (s *Store) ReportSLA(ctx context.Context, tenantID string, windowDays int) 
 		WorstIncidentMinutes: int64(worst),
 		MonitoredDeviceCount: deviceCount,
 	}, nil
+}
+
+
+func (s *Store) UpdateSLATarget(ctx context.Context, tenantID string, target float64) error {
+	_, err := s.pool.Exec(ctx, `UPDATE tenants SET sla_target_percent=$1, updated_at=now() WHERE id=$2::uuid`, target, tenantID)
+	return err
 }

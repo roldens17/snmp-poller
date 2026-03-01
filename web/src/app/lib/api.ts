@@ -373,6 +373,13 @@ export const reportsAPI = {
     return apiRequest(`/reports/incidents?limit=${limit}`);
   },
 
+  async setSLATarget(target: number) {
+    return apiRequest(`/reports/sla-target`, {
+      method: "PATCH",
+      body: JSON.stringify({ target }),
+    });
+  },
+
   downloadSLAcsv() {
     window.open(`${API_BASE}/reports/sla.csv`, '_blank');
   },
