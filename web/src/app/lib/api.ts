@@ -380,6 +380,29 @@ export const reportsAPI = {
     });
   },
 
+  async getReportRecipients() {
+    return apiRequest(`/reports/recipients`);
+  },
+
+  async upsertReportRecipient(email: string, frequency = "monthly", enabled = true) {
+    return apiRequest(`/reports/recipients`, {
+      method: "POST",
+      body: JSON.stringify({ email, frequency, enabled }),
+    });
+  },
+
+  async deleteReportRecipient(id: number) {
+    return apiRequest(`/reports/recipients/${id}`, { method: "DELETE" });
+  },
+
+  async getReportDeliveryHistory(limit = 50) {
+    return apiRequest(`/reports/delivery-history?limit=${limit}`);
+  },
+
+  async sendReportNow() {
+    return apiRequest(`/reports/send-now`, { method: "POST" });
+  },
+
   downloadSLAcsv() {
     window.open(`${API_BASE}/reports/sla.csv`, '_blank');
   },

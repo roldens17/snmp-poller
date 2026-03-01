@@ -426,3 +426,73 @@ func (s *HTTPServer) handleSetSLATarget(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
+
+func (s *HTTPServer) handleListReportRecipients(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	rows, err := s.store.ListReportRecipients(c.Request.Context(), tenantID)
+	if err != nil { s.respondErr(c, err); return }
+	c.JSON(http.StatusOK, gin.H{"recipients": rows})
+}
+
+func (s *HTTPServer) handleUpsertReportRecipient(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	var req struct {
+		Email string `json:"email"`
+		Frequency string `json:"frequency"`
+		Enabled *bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error":"invalid payload"})
+		return
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" || !strings.Contains(req.Email, "@") {
+		c.JSON(http.StatusBadRequest, gin.H{"error":"valid email required"})
+		return
+	}
+	if req.Frequency == "" { req.Frequency = "monthly" }
+	enabled := true
+	if req.Enabled != nil { enabled = *req.Enabled }
+	if err := s.store.UpsertReportRecipient(c.Request.Context(), tenantID, req.Email, req.Frequency, enabled); err != nil {
+		s.respondErr(c, err); return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (s *HTTPServer) handleDeleteReportRecipient(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error":"invalid id"}); return }
+	if err := s.store.DeleteReportRecipient(c.Request.Context(), tenantID, id); err != nil {
+		s.respondErr(c, err); return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (s *HTTPServer) handleReportDeliveryHistory(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	limit := 100
+	if l := strings.TrimSpace(c.Query("limit")); l != "" {
+		if n, err := strconv.Atoi(l); err == nil { limit = n }
+	}
+	rows, err := s.store.ListReportDeliveryHistory(c.Request.Context(), tenantID, limit)
+	if err != nil { s.respondErr(c, err); return }
+	c.JSON(http.StatusOK, gin.H{"history": rows})
+}
+
+func (s *HTTPServer) handleSendReportNow(c *gin.Context) {
+	tenantID := s.getTenantID(c)
+	rows, err := s.store.ListReportRecipients(c.Request.Context(), tenantID)
+	if err != nil { s.respondErr(c, err); return }
+	if len(rows) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error":"no recipients configured"})
+		return
+	}
+	to := time.Now().UTC()
+	from := to.Add(-30 * 24 * time.Hour)
+	for _, r := range rows {
+		if !r.Enabled { continue }
+		_ = s.store.AddReportDeliveryHistory(c.Request.Context(), tenantID, r.Email, "sla_monthly", "queued", from.Format(time.RFC3339), to.Format(time.RFC3339), "")
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "queued": true})
+}

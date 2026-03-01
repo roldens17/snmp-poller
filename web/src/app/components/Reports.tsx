@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { reportsAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Download, FileText, FileDown } from 'lucide-react';
+import { Download, FileText, FileDown, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Reports() {
@@ -13,6 +13,26 @@ export function Reports() {
   const [incidents, setIncidents] = useState<any[]>([]);
   const [slaTarget, setSlaTarget] = useState('99.9');
   const [savingTarget, setSavingTarget] = useState(false);
+
+  const [recipients, setRecipients] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [recipientEmail, setRecipientEmail] = useState('');
+
+  useEffect(() => {
+    generate();
+    loadDelivery();
+  }, []);
+
+  async function loadDelivery() {
+    try {
+      const [r, h] = await Promise.all([
+        reportsAPI.getReportRecipients(),
+        reportsAPI.getReportDeliveryHistory(20),
+      ]);
+      setRecipients(r?.recipients || []);
+      setHistory(h?.history || []);
+    } catch {}
+  }
 
   async function generate() {
     setLoading(true);
@@ -32,7 +52,6 @@ export function Reports() {
     }
   }
 
-
   async function saveTarget() {
     setSavingTarget(true);
     try {
@@ -50,25 +69,48 @@ export function Reports() {
     if (!sla) return;
     const subject = encodeURIComponent(`SLA Report (${days}d)`);
     const body = encodeURIComponent(
-      `SLA Summary
-` +
-      `Uptime: ${Number(sla.uptime_percent).toFixed(2)}%
-` +
-      `Target: ${Number(sla.sla_target_percent || 99.9).toFixed(2)}%
-` +
-      `Incidents: ${sla.incidents_count}
-` +
-      `Avg MTTR: ${Number(sla.avg_resolve_minutes).toFixed(1)}m
-
-` +
-      `Export links:
-` +
-      `${window.location.origin}/api/reports/sla.csv
-` +
-      `${window.location.origin}/api/reports/incidents.csv
-`
+      `SLA Summary\n` +
+      `Uptime: ${Number(sla.uptime_percent).toFixed(2)}%\n` +
+      `Target: ${Number(sla.sla_target_percent || 99.9).toFixed(2)}%\n` +
+      `Incidents: ${sla.incidents_count}\n` +
+      `Avg MTTR: ${Number(sla.avg_resolve_minutes).toFixed(1)}m\n\n` +
+      `Export links:\n` +
+      `${window.location.origin}/api/reports/sla.csv\n` +
+      `${window.location.origin}/api/reports/incidents.csv\n`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
+
+  async function addRecipient() {
+    if (!recipientEmail) return;
+    try {
+      await reportsAPI.upsertReportRecipient(recipientEmail, 'monthly', true);
+      setRecipientEmail('');
+      toast.success('Recipient saved');
+      await loadDelivery();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save recipient');
+    }
+  }
+
+  async function removeRecipient(id: number) {
+    try {
+      await reportsAPI.deleteReportRecipient(id);
+      toast.success('Recipient removed');
+      await loadDelivery();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to remove recipient');
+    }
+  }
+
+  async function sendNow() {
+    try {
+      await reportsAPI.sendReportNow();
+      toast.success('Report queued for recipients');
+      await loadDelivery();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to queue report');
+    }
   }
 
   return (
@@ -108,6 +150,33 @@ export function Reports() {
               <Button variant="outline" onClick={() => window.open(`/reports/print?days=${days}`, '_blank')}><FileDown className="w-4 h-4 mr-1" />Print/PDF</Button>
               <Button variant="outline" onClick={emailReport}>Email this report</Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-midnight-card border border-midnight-border">
+        <CardHeader><CardTitle>Report Delivery</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <input value={recipientEmail} onChange={(e)=>setRecipientEmail(e.target.value)} placeholder="client@example.com" className="h-10 flex-1 rounded-md border border-midnight-border bg-midnight-bg px-3 text-sm" />
+            <Button onClick={addRecipient}>Add recipient</Button>
+            <Button variant="outline" onClick={sendNow}><Send className="w-4 h-4 mr-1" />Send now</Button>
+          </div>
+          <div className="space-y-2">
+            {recipients.length === 0 ? <div className="text-sm text-midnight-text-secondary">No recipients configured.</div> : recipients.map((r:any)=>(
+              <div key={r.id} className="flex items-center justify-between p-2 rounded border border-midnight-border bg-midnight-bg">
+                <div className="text-sm">{r.email}</div>
+                <Button variant="outline" size="sm" onClick={()=>removeRecipient(r.id)}><Trash2 className="w-4 h-4" /></Button>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm font-medium">Recent delivery history</div>
+            {history.length === 0 ? <div className="text-sm text-midnight-text-secondary">No deliveries yet.</div> : history.map((h:any)=>(
+              <div key={h.id} className="text-xs text-midnight-text-secondary p-2 border border-midnight-border rounded bg-midnight-bg">
+                {h.created_at} • {h.recipient_email} • {h.status}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

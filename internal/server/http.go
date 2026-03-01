@@ -220,6 +220,11 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/reports/sla.csv", s.handleReportSLAcsv)
 	protected.GET("/reports/incidents.csv", s.handleReportIncidentsCSV)
 	protected.PATCH("/reports/sla-target", s.handleSetSLATarget)
+	protected.GET("/reports/recipients", s.handleListReportRecipients)
+	protected.POST("/reports/recipients", s.handleUpsertReportRecipient)
+	protected.DELETE("/reports/recipients/:id", s.handleDeleteReportRecipient)
+	protected.GET("/reports/delivery-history", s.handleReportDeliveryHistory)
+	protected.POST("/reports/send-now", s.handleSendReportNow)
 	if s.cfg.Metrics.Enabled {
 		if s.cfg.Metrics.Public {
 			engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
