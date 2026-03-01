@@ -176,8 +176,9 @@ func (s *HTTPServer) handleTestAlertDestination(c *gin.Context) {
 	}
 
 	payload := map[string]any{
-		"event": "webhook.test",
-		"message": "SNMP SaaS webhook test",
+		"text":      "SNMP SaaS webhook test ✅",
+		"event":     "webhook.test",
+		"message":   "SNMP SaaS webhook test",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 		"tenant_id": tenantID,
 	}
@@ -199,14 +200,17 @@ func (s *HTTPServer) handleTestAlertDestination(c *gin.Context) {
 		return
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
+	respBody, _ := io.ReadAll(resp.Body)
 
 	sc := resp.StatusCode
 	success := sc >= 200 && sc < 300
 	_ = s.store.RecordAlertDelivery(c.Request.Context(), store.AlertDelivery{TenantID: tenantID, DestinationID: dest.ID, AlertID: 0, Event: "webhook.test", Attempt: 1, StatusCode: &sc, Success: success, DurationMs: 0, Error: ""})
 
 	if !success {
-		c.JSON(http.StatusBadGateway, gin.H{"ok": false, "status": sc})
+		errText := strings.TrimSpace(string(respBody))
+		if errText == "" { errText = http.StatusText(sc) }
+		_ = s.store.RecordAlertDelivery(c.Request.Context(), store.AlertDelivery{TenantID: tenantID, DestinationID: dest.ID, AlertID: 0, Event: "webhook.test", Attempt: 1, StatusCode: &sc, Success: false, DurationMs: 0, Error: errText})
+		c.JSON(http.StatusBadGateway, gin.H{"ok": false, "status": sc, "error": errText})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "status": sc})
