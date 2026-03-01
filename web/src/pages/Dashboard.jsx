@@ -98,8 +98,8 @@ export function Dashboard() {
         try {
             const details = await api.getTenantOverviewDetails(tenantId);
             setTenantDetails({
-                Devices down: details.devices_down || [],
-                Active alerts: details.active_alerts || [],
+                devices_down: details.devices_down || [],
+                active_alerts: details.active_alerts || [],
             });
         } catch (err) {
             console.error('failed tenant details', err);
