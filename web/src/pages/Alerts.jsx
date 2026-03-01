@@ -5,7 +5,7 @@ import { Octagon, AlertTriangle, ArrowRight, BellRing, RefreshCw } from 'lucide-
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import { parseAPITimestamp } from '../utils/time';
+import { parseAPITriggeredstamp } from '../utils/time';
 
 export function Alerts() {
     const [alerts, setAlerts] = useState([]);
@@ -24,7 +24,7 @@ export function Alerts() {
             setLastUpdated(new Date());
         } catch (err) {
             console.error('Failed to load alerts', err);
-            setError('Unable to load alerts right now.');
+            setError('Unable to load incident feed right now.');
         } finally {
             setLoading(false);
         }
@@ -57,31 +57,34 @@ export function Alerts() {
                     <div className="p-2 rounded-xl bg-gold/10 border border-gold/10">
                         <BellRing className="w-5 h-5 text-gold" />
                     </div>
-                    <span className="text-glow text-white">Alert History</span>
+                    <span className="text-glow text-white">Incident Feed</span>
                 </h2>
                 <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
+                    <span className="text-[11px] uppercase tracking-wider px-2 py-1 rounded border border-green-500/30 bg-green-500/10 text-green-300">Pipeline: Active</span>
                     {lastUpdated && (
                         <span className="text-[11px] uppercase tracking-wider text-gray-500">
-                            Updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+                            Feed updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
                         </span>
                     )}
                     <button
                         onClick={loadAlerts}
                         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-semibold border border-white/10 transition"
-                        title="Refresh alerts"
+                        title="Refresh incident feed"
                     >
                         <RefreshCw className="w-4 h-4" />
                         Refresh
                     </button>
                     <select className="px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-sm text-gray-300 focus:ring-1 focus:ring-gold/50 outline-none backdrop-blur-sm hover:bg-black/60 transition cursor-pointer">
-                        <option>Severity: All</option>
+                        <option>Severity: all</option>
                         <option>Critical</option>
-                        <option>Major</option>
+                        <option>Warning</option>
+                        <option>Info</option>
                     </select>
                     <select className="px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-sm text-gray-300 focus:ring-1 focus:ring-gold/50 outline-none backdrop-blur-sm hover:bg-black/60 transition cursor-pointer">
-                        <option>Type: All</option>
-                        <option>Ups/Downs</option>
-                        <option>Errors</option>
+                        <option>Alert Type: all</option>
+                        <option>Device availability</option>
+                        <option>Topology</option>
+                        <option>Performance</option>
                     </select>
                 </div>
             </div>
@@ -90,10 +93,10 @@ export function Alerts() {
                 <div className="min-w-[900px]">
                     <div className="bg-white/5 sticky top-0 backdrop-blur-md z-10 text-left text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-white/5 grid grid-cols-12">
                         <div className="p-4 pl-6 col-span-2">Severity</div>
-                        <div className="p-4 col-span-2">Type</div>
-                        <div className="p-4 col-span-2">Source</div>
-                        <div className="p-4 col-span-2">Status</div>
-                        <div className="p-4 col-span-2">Time</div>
+                        <div className="p-4 col-span-2">Alert Type</div>
+                        <div className="p-4 col-span-2">Target</div>
+                        <div className="p-4 col-span-2">Severity</div>
+                        <div className="p-4 col-span-2">Triggered</div>
                         <div className="p-4 pr-6 col-span-2 text-right">Actions</div>
                     </div>
                     <div className="divide-y divide-white/5">
@@ -120,7 +123,7 @@ export function Alerts() {
                                         {a.severity === 'critical' ? <Octagon className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                                     </div>
                                 </div>
-                                <div className="p-4 col-span-2 text-sm font-bold text-gray-200 group-hover:text-white transition">{a.category}</div>
+                                <div className="p-4 col-span-2 text-sm font-bold text-gray-200 group-hover:text-white transition">{a.title || a.alert_type || a.category}</div>
                                 <div className="p-4 col-span-2 text-sm text-gold/80 font-mono">Device #{a.device_id}</div>
                                 <div className="p-4 col-span-2">
                                     <span className={clsx("px-2.5 py-1 inline-flex text-xs leading-5 font-bold uppercase tracking-wide rounded-full border shadow-sm", getSeverityColor(a.severity))}>
@@ -129,7 +132,7 @@ export function Alerts() {
                                 </div>
                                 <div className="p-4 col-span-2 text-xs text-gray-500 font-mono tracking-wide">
                                     {(() => {
-                                        const ts = parseAPITimestamp(a.triggered_at);
+                                        const ts = parseAPITriggeredstamp(a.triggered_at);
                                         return ts ? formatDistanceToNow(ts, { addSuffix: true }) : 'unknown';
                                     })()}
                                 </div>
@@ -151,7 +154,7 @@ export function Alerts() {
                             </div>
                         ))}
                         {!loading && !error && alerts.length === 0 && (
-                            <div className="p-12 text-center text-gray-500 italic">No active alerts recorded.</div>
+                            <div className="p-12 text-center text-gray-500 italic">No active incidents. Your network is stable right now.</div>
                         )}
                     </div>
                 </div>
