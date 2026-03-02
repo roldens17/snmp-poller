@@ -230,9 +230,51 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID st
 	ctx, cancel := context.WithTimeout(ctx, sw.Timeout.Duration+time.Second)
 	defer cancel()
 
+	// Long-term reliability fix:
+	// 1) lightweight reachability probe decides up/down availability
+	// 2) heavy interface walk is best-effort and must not page by itself
+	probeCtx, probeCancel := context.WithTimeout(ctx, sw.Timeout.Duration)
+	probe, probeErr := snmpclient.ProbeDevice(probeCtx, sw)
+	probeCancel()
+	if probeErr != nil || probe == nil || !probe.Reachable {
+		if probeErr != nil {
+			return fmt.Errorf("probe: %w", probeErr)
+		}
+		return fmt.Errorf("probe: unreachable")
+	}
+
 	ifaces, err := snmpclient.PollInterfaces(ctx, sw)
 	if err != nil {
-		return fmt.Errorf("interfaces: %w", err)
+		logger.Warn().Err(err).Msg("interfaces walk failed; treating as partial success (device reachable)")
+		pollTime := time.Now().UTC()
+		device := &store.Device{
+			TenantID:    s.defaultTenantID,
+			Hostname:    sw.Name,
+			MgmtIP:      sw.Address,
+			Community:   sw.Community,
+			Enabled:     sw.EnabledValue(),
+			Site:        sw.Site,
+			Description: sw.Description,
+			LastSeen:    &pollTime,
+			Status:      "active",
+		}
+		deviceID, upsertErr := s.store.UpsertDevice(ctx, device)
+		if upsertErr == nil {
+			_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
+				TenantID:            s.defaultTenantID,
+				DeviceID:            fmt.Sprintf("%d", deviceID),
+				DeviceName:          sw.Name,
+				DeviceIP:            sw.Address,
+				Success:             true,
+				PolledAt:            pollTime,
+				RequestID:           requestID,
+				DurationMS:          time.Since(startedAt).Milliseconds(),
+				PollIntervalSeconds: int(s.cfg.PollInterval.Duration / time.Second),
+				FailThreshold:       3,
+				ClearThreshold:      2,
+			})
+		}
+		return nil
 	}
 	macs, err := snmpclient.PollMACTable(ctx, sw)
 	if err != nil {
