@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -33,6 +34,7 @@ const (
 
 // Payload structure for webhooks.
 type WebhookPayload struct {
+	Text   string     `json:"text,omitempty"`
 	Tenant TenantInfo `json:"tenant"`
 	Event  EventType  `json:"event"`
 	Alert  AlertInfo  `json:"alert"`
@@ -71,7 +73,9 @@ func (s *Service) Dispatch(ctx context.Context, tenantID string, event EventType
 	if dashboardURL == "" {
 		dashboardURL = "http://localhost:3000"
 	}
+	text := "[" + string(event) + "] Device " + fmt.Sprintf("%d", alert.DeviceID) + " - " + alert.Message
 	payload := WebhookPayload{
+		Text:   text,
 		Tenant: TenantInfo{ID: tenantID},
 		Event:  event,
 		Alert: AlertInfo{
