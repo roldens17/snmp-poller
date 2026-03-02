@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -34,6 +35,24 @@ func toAuthUserResponse(u *store.User) authUserResponse {
 		Name:  u.Name,
 		Role:  u.Role,
 	}
+}
+
+
+func (s *HTTPServer) isSuperAdmin(user *store.User) bool {
+	if user == nil {
+		return false
+	}
+	raw := strings.TrimSpace(os.Getenv("SUPERADMIN_EMAILS"))
+	if raw == "" {
+		return false
+	}
+	email := strings.ToLower(strings.TrimSpace(user.Email))
+	for _, it := range strings.Split(raw, ",") {
+		if email == strings.ToLower(strings.TrimSpace(it)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *HTTPServer) setAuthCookie(c *gin.Context, token string, maxAge int) {
@@ -94,34 +113,49 @@ func (s *HTTPServer) authRequired() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if len(tenants) == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no active tenant assigned"})
-			c.Abort()
-			return
-		}
 
 		// Determine Active Tenant
 		var activeTenant *store.Tenant
 		requestedTenantID := claims.TenantID
+		super := s.isSuperAdmin(user)
 
-		if requestedTenantID != "" {
-			// Validate membership
-			for _, t := range tenants {
-				if t.ID == requestedTenantID {
-					activeTenant = &t
-					break
+		if super {
+			if requestedTenantID != "" {
+				t, err := s.store.GetTenantByID(c.Request.Context(), requestedTenantID)
+				if err == nil {
+					activeTenant = t
 				}
 			}
-			// If session tenant is invalid (removed from org?), return 403 or fallback?
-			// Requirement: "Must not allow switching to tenant without membership."
 			if activeTenant == nil {
-				c.JSON(http.StatusForbidden, gin.H{"error": "access restricted for this tenant"})
+				all, err := s.store.ListAllTenants(c.Request.Context())
+				if err != nil || len(all) == 0 {
+					c.JSON(http.StatusForbidden, gin.H{"error": "no tenants available"})
+					c.Abort()
+					return
+				}
+				activeTenant = &all[0]
+			}
+		} else {
+			if len(tenants) == 0 {
+				c.JSON(http.StatusForbidden, gin.H{"error": "no active tenant assigned"})
 				c.Abort()
 				return
 			}
-		} else {
-			// Fallback to first tenant
-			activeTenant = &tenants[0]
+			if requestedTenantID != "" {
+				for _, t := range tenants {
+					if t.ID == requestedTenantID {
+						activeTenant = &t
+						break
+					}
+				}
+				if activeTenant == nil {
+					c.JSON(http.StatusForbidden, gin.H{"error": "access restricted for this tenant"})
+					c.Abort()
+					return
+				}
+			} else {
+				activeTenant = &tenants[0]
+			}
 		}
 
 		c.Set(authUserContextKey, user)
@@ -230,7 +264,7 @@ func (s *HTTPServer) handleAuthMe(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	resp := gin.H{"user": toAuthUserResponse(user)}
+	resp := gin.H{"user": toAuthUserResponse(user), "is_superadmin": s.isSuperAdmin(user)}
 	if tenant, ok := s.getAuthTenant(c); ok && tenant != nil {
 		resp["tenant"] = tenant
 	}
@@ -464,24 +498,35 @@ func (s *HTTPServer) handleSwitchTenant(c *gin.Context) {
 		return
 	}
 
-	// Verify membership
-	tenants, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
-	if err != nil {
-		s.respondErr(c, err)
-		return
-	}
-
 	var targetTenant *store.Tenant
-	for _, t := range tenants {
-		if t.ID == req.TenantID {
-			targetTenant = &t
-			break
+	if s.isSuperAdmin(user) {
+		t, err := s.store.GetTenantByID(c.Request.Context(), req.TenantID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+				return
+			}
+			s.respondErr(c, err)
+			return
 		}
-	}
-
-	if targetTenant == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
+		targetTenant = t
+	} else {
+		// Verify membership
+		tenants, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+		if err != nil {
+			s.respondErr(c, err)
+			return
+		}
+		for _, t := range tenants {
+			if t.ID == req.TenantID {
+				targetTenant = &t
+				break
+			}
+		}
+		if targetTenant == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
 	}
 
 	// Issue new token

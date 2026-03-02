@@ -273,7 +273,15 @@ func (s *HTTPServer) handleListTenants(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	tenants, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+	var (
+		tenants []store.Tenant
+		err     error
+	)
+	if s.isSuperAdmin(user) {
+		tenants, err = s.store.ListAllTenants(c.Request.Context())
+	} else {
+		tenants, err = s.store.GetUserTenants(c.Request.Context(), user.ID)
+	}
 	if err != nil {
 		s.respondErr(c, err)
 		return
