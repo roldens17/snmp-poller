@@ -164,6 +164,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.Use(s.authRequired())
 	protected.GET("/system/status", s.handleSystemStatus)
 	protected.GET("/tenants", s.handleListTenants)
+	protected.POST("/tenants", s.handleCreateTenant)
 	protected.GET("/tenants/active", s.handleGetActiveTenant)
 	protected.POST("/tenants/active", s.handleSwitchTenant)
 	protected.PATCH("/tenants/active", s.handleUpdateActiveTenant)

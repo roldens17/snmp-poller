@@ -358,6 +358,13 @@ export const tenantAPI = {
     return apiRequest('/tenants');
   },
 
+  async create(name: string, slug?: string, autoSwitch = true) {
+    return apiRequest('/tenants', {
+      method: 'POST',
+      body: JSON.stringify({ name, slug, auto_switch: autoSwitch }),
+    });
+  },
+
   async get(tenantId: string) {
     const data = await apiRequest('/tenants');
     return { tenant: (data?.tenants || []).find((t: any) => t.id === tenantId) };

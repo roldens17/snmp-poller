@@ -25,6 +25,8 @@ export function Settings() {
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [members, setMembers] = useState<any[]>([]);
+  const [newTenant, setNewTenant] = useState({ name: '', slug: '' });
+  const [creatingTenant, setCreatingTenant] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -118,6 +120,28 @@ export function Settings() {
     }
   }
 
+
+  async function handleCreateTenant(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTenant.name.trim()) return;
+    setCreatingTenant(true);
+    try {
+      const res = await tenantAPI.create(newTenant.name.trim(), newTenant.slug.trim() || undefined, true);
+      const t = res?.tenant;
+      if (t) {
+        setTenant(t);
+        setOrgForm({ name: t.name || '', slug: t.slug || '' });
+      }
+      setNewTenant({ name: '', slug: '' });
+      toast.success('Tenant created and switched');
+      await loadData();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create tenant');
+    } finally {
+      setCreatingTenant(false);
+    }
+  }
+
   async function copyInviteLink() {
     if (!inviteLink) return;
     await navigator.clipboard.writeText(inviteLink);
@@ -146,6 +170,28 @@ export function Settings() {
           Invite User
         </Button>
       </div>
+
+
+      <Card className="bg-midnight-card border border-midnight-border">
+        <CardHeader>
+          <CardTitle className="text-midnight-text-primary">Create Tenant</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateTenant} className="grid md:grid-cols-3 gap-3 items-end">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input placeholder="Acme NOC" value={newTenant.name} onChange={(e) => setNewTenant(prev => ({ ...prev, name: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Slug (optional)</Label>
+              <Input placeholder="acme-noc" value={newTenant.slug} onChange={(e) => setNewTenant(prev => ({ ...prev, slug: e.target.value }))} />
+            </div>
+            <Button type="submit" disabled={creatingTenant} className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600">
+              {creatingTenant ? 'Creating...' : 'Create & Switch'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card id="invite-section" className="bg-midnight-card border border-midnight-border">
         <CardHeader>
