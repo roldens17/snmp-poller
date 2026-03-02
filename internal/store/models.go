@@ -192,3 +192,13 @@ type AlertDelivery struct {
 	Error         string    `json:"error,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+
+// TenantMember is a user membership row for tenant administration.
+type TenantMember struct {
+	UserID    string    `json:"user_id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+}

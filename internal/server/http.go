@@ -174,6 +174,9 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/audit/events", s.handleListAudit)
 	protected.GET("/billing/plan", s.handleGetPlan)
 	protected.PATCH("/billing/plan", s.handleUpdatePlan)
+	protected.GET("/tenants/members", s.handleListTenantMembers)
+	protected.PATCH("/tenants/members/:userId", s.handleUpdateTenantMemberRole)
+	protected.DELETE("/tenants/members/:userId", s.handleRemoveTenantMember)
 
 	log.Info().Bool("demo_mode", s.cfg.DemoMode).Msg("server config")
 

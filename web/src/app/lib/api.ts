@@ -483,3 +483,16 @@ export const topologyAPI = {
     return apiRequest('/api/topology');
   },
 };
+
+
+export const tenantMembersAPI = {
+  async list() {
+    return apiRequest('/tenants/members');
+  },
+  async updateRole(userId: string, role: "viewer" | "admin" | "owner") {
+    return apiRequest(`/tenants/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+  },
+  async remove(userId: string) {
+    return apiRequest(`/tenants/members/${userId}`, { method: "DELETE" });
+  },
+};

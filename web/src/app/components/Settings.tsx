@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { authAPI, inviteAPI, tenantAPI } from '../lib/api';
+import { authAPI, inviteAPI, tenantAPI, tenantMembersAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -24,6 +24,7 @@ export function Settings() {
   const [inviteForm, setInviteForm] = useState({ email: '', role: 'viewer', expiresInHours: 72 });
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [members, setMembers] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -40,8 +41,9 @@ export function Settings() {
       }
       setOrgForm({ name: session.tenant?.name || '', slug: session.tenant?.slug || '' });
 
-      const inv = await inviteAPI.list();
+      const [inv, mem] = await Promise.all([inviteAPI.list(), tenantMembersAPI.list()]);
       setInvites(inv?.invites || []);
+      setMembers(mem?.members || []);
     } catch (error: any) {
       console.error('Load settings error:', error);
       toast.error('Failed to load settings');
@@ -91,6 +93,28 @@ export function Settings() {
       toast.success('Invite deleted');
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete invite');
+    }
+  }
+
+
+  async function updateMemberRole(userId: string, role: string) {
+    try {
+      await tenantMembersAPI.updateRole(userId, role as any);
+      setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, role } : m));
+      toast.success('Member role updated');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update member role');
+    }
+  }
+
+  async function removeMember(userId: string) {
+    if (!confirm('Remove this member from tenant?')) return;
+    try {
+      await tenantMembersAPI.remove(userId);
+      setMembers(prev => prev.filter(m => m.user_id !== userId));
+      toast.success('Member removed');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove member');
     }
   }
 
@@ -210,6 +234,41 @@ export function Settings() {
             <Label>Created</Label>
             <Input value={tenant?.created_at ? new Date(tenant.created_at).toLocaleString() : ''} disabled />
           </div>
+        </CardContent>
+      </Card>
+
+
+      <Card className="bg-midnight-card border border-midnight-border">
+        <CardHeader>
+          <CardTitle className="text-midnight-text-primary">Tenant Members</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {members.length === 0 ? (
+            <p className="text-sm text-midnight-text-secondary">No members yet.</p>
+          ) : members.map((m) => (
+            <div key={m.user_id} className="flex items-center justify-between p-3 rounded-lg border border-midnight-border bg-midnight-bg">
+              <div>
+                <div className="text-sm text-midnight-text-primary">{m.name || m.email}</div>
+                <div className="text-xs text-midnight-text-secondary">{m.email}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="h-9 rounded-md border border-midnight-border bg-midnight-card px-2 text-sm"
+                  value={m.role}
+                  onChange={(e) => updateMemberRole(m.user_id, e.target.value)}
+                >
+                  <option value="viewer">viewer</option>
+                  <option value="admin">admin</option>
+                  <option value="owner">owner</option>
+                </select>
+                {m.user_id !== user?.id && (
+                  <Button variant="outline" size="sm" onClick={() => removeMember(m.user_id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
