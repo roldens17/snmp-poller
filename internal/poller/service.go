@@ -2,6 +2,8 @@ package poller
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -13,7 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/fresatu/snmp-poller/internal/alerts"
-"github.com/fresatu/snmp-poller/internal/config"
+	"github.com/fresatu/snmp-poller/internal/config"
 	"github.com/fresatu/snmp-poller/internal/devicereg"
 	"github.com/fresatu/snmp-poller/internal/notification"
 	"github.com/fresatu/snmp-poller/internal/security"
@@ -208,11 +210,12 @@ func (s *Service) worker(ctx context.Context, id int) {
 				return
 			}
 			start := time.Now()
-			err := s.pollDevice(ctx, sw)
+			requestID := newPollRequestID()
+		err := s.pollDevice(ctx, sw, requestID, start)
 			if err != nil {
 				logger.Warn().Err(err).Str("device", sw.Name).Msg("poll failed")
 				s.metrics.observeError(sw.Name)
-				s.markDeviceFailure(ctx, sw, err)
+				s.markDeviceFailure(ctx, sw, err, requestID, time.Since(start))
 			} else {
 				s.metrics.observeDuration(sw.Name, time.Since(start))
 			}
@@ -221,7 +224,7 @@ func (s *Service) worker(ctx context.Context, id int) {
 	}
 }
 
-func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
+func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID string, startedAt time.Time) error {
 	sw.Address = normalizeHost(sw.Address)
 	logger := log.With().Str("device", sw.Name).Str("ip", sw.Address).Logger()
 	ctx, cancel := context.WithTimeout(ctx, sw.Timeout.Duration+time.Second)
@@ -330,14 +333,28 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch) error {
 	s.clearDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down")
 	s.evaluateAlerts(ctx, s.defaultTenantID, deviceID, pollTime, ifaces, prevStates, prevCounters)
 	_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
-		TenantID:   s.defaultTenantID,
-		DeviceID:   fmt.Sprintf("%d", deviceID),
-		DeviceName: sw.Name,
-		DeviceIP:   sw.Address,
-		Success:    true,
-		PolledAt:   pollTime,
+		TenantID:            s.defaultTenantID,
+		DeviceID:            fmt.Sprintf("%d", deviceID),
+		DeviceName:          sw.Name,
+		DeviceIP:            sw.Address,
+		Success:             true,
+		PolledAt:            pollTime,
+		RequestID:           requestID,
+		DurationMS:          time.Since(startedAt).Milliseconds(),
+		PollIntervalSeconds: int(s.cfg.PollInterval.Duration / time.Second),
+		FailThreshold:       3,
+		ClearThreshold:      2,
 	})
 	return nil
+}
+
+
+func newPollRequestID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("poll-%d", time.Now().UnixNano())
+	}
+	return "poll-" + hex.EncodeToString(b)
 }
 
 func normalizeHost(raw string) string {
@@ -351,7 +368,7 @@ func normalizeHost(raw string) string {
 	return trimmed
 }
 
-func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollErr error) {
+func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollErr error, requestID string, duration time.Duration) {
 	deviceID := sw.DeviceID
 	if deviceID == 0 {
 		if id, ok, err := s.store.GetDeviceIDByHostname(ctx, s.defaultTenantID, sw.Name); err == nil && ok {
@@ -370,13 +387,18 @@ func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollE
 	}
 	if deviceID > 0 {
 		_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
-			TenantID:   s.defaultTenantID,
-			DeviceID:   fmt.Sprintf("%d", deviceID),
-			DeviceName: sw.Name,
-			DeviceIP:   normalizeHost(sw.Address),
-			Success:    false,
-			Err:        pollErr.Error(),
-			PolledAt:   time.Now().UTC(),
+			TenantID:            s.defaultTenantID,
+			DeviceID:            fmt.Sprintf("%d", deviceID),
+			DeviceName:          sw.Name,
+			DeviceIP:            normalizeHost(sw.Address),
+			Success:             false,
+			Err:                 pollErr.Error(),
+			PolledAt:            time.Now().UTC(),
+			RequestID:           requestID,
+			DurationMS:          duration.Milliseconds(),
+			PollIntervalSeconds: int(s.cfg.PollInterval.Duration / time.Second),
+			FailThreshold:       3,
+			ClearThreshold:      2,
 		})
 		if err := s.store.UpdateDeviceStatus(ctx, s.defaultTenantID, deviceID, "error", nil); err != nil {
 			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to update device status")

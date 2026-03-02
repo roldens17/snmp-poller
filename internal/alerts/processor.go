@@ -11,13 +11,18 @@ import (
 )
 
 type PollResult struct {
-	TenantID   string
-	DeviceID   string
-	DeviceName string
-	DeviceIP   string
-	Success    bool
-	Err        string
-	PolledAt   time.Time
+	TenantID             string
+	DeviceID             string
+	DeviceName           string
+	DeviceIP             string
+	Success              bool
+	Err                  string
+	PolledAt             time.Time
+	RequestID            string
+	DurationMS           int64
+	PollIntervalSeconds  int
+	FailThreshold        int
+	ClearThreshold       int
 }
 
 func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) error {
@@ -26,6 +31,15 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 	}
 	if result.PolledAt.IsZero() {
 		result.PolledAt = time.Now().UTC()
+	}
+	if result.PollIntervalSeconds <= 0 {
+		result.PollIntervalSeconds = 60
+	}
+	if result.FailThreshold <= 0 {
+		result.FailThreshold = 3
+	}
+	if result.ClearThreshold <= 0 {
+		result.ClearThreshold = 2
 	}
 	deviceID, err := strconv.ParseInt(result.DeviceID, 10, 64)
 	if err != nil {
@@ -97,9 +111,9 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 		"snmp_version":         "2c",
 		"last_success_at":      lastSuccessAt,
 		"consecutive_failures": failures,
-		"poll_interval_seconds": 60,
-		"fail_threshold":       3,
-		"clear_threshold":      2,
+		"poll_interval_seconds": result.PollIntervalSeconds,
+		"fail_threshold":       result.FailThreshold,
+		"clear_threshold":      result.ClearThreshold,
 	}
 
 	details := map[string]any{
@@ -111,6 +125,7 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 			"target":    fmt.Sprintf("%s:%d", result.DeviceIP, 161),
 			"phase":     "poll",
 			"library":   "gosnmp",
+			"request_id": result.RequestID,
 		},
 	}
 
@@ -163,7 +178,7 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 		newState = "UP"
 		stateChanged = true
 		if activeAlertID > 0 {
-			eventMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": "Device recovered", "consecutive_successes": successes})
+			eventMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": "Device recovered", "consecutive_successes": successes, "request_id": result.RequestID, "duration_ms": result.DurationMS})
 			_, _ = tx.Exec(ctx, `
 				INSERT INTO audit_events (tenant_id, action, resource, resource_id, metadata)
 				VALUES ($1::uuid, 'ALERT_CLEARED', 'alert', $2, $3::jsonb)
@@ -193,10 +208,10 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 
 	if activeAlertID > 0 {
 		eventType := "POLL_FAILURE"
-		eventMeta := map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures}
+		eventMeta := map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures, "request_id": result.RequestID, "duration_ms": result.DurationMS}
 		if result.Success {
 			eventType = "POLL_SUCCESS"
-			eventMeta = map[string]any{"message": "SNMP poll succeeded", "consecutive_successes": successes}
+			eventMeta = map[string]any{"message": "SNMP poll succeeded", "consecutive_successes": successes, "request_id": result.RequestID, "duration_ms": result.DurationMS}
 		}
 		metaJSON, _ := json.Marshal(eventMeta)
 		_, _ = tx.Exec(ctx, `
@@ -204,7 +219,7 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 			VALUES ($1::uuid, $2, 'alert', $3, $4::jsonb)
 		`, result.TenantID, eventType, fmt.Sprintf("%d", activeAlertID), string(metaJSON))
 		if tr.Transition == "down" {
-			triggerMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures})
+			triggerMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures, "request_id": result.RequestID, "duration_ms": result.DurationMS})
 			_, _ = tx.Exec(ctx, `
 				INSERT INTO audit_events (tenant_id, action, resource, resource_id, metadata)
 				VALUES ($1::uuid, 'ALERT_TRIGGERED', 'alert', $2, $3::jsonb)
