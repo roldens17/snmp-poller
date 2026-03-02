@@ -144,7 +144,7 @@ export const deviceAPI = {
   },
 };
 
-function mapIncident(alert: any) {
+function mapIncident(alert: any, deviceNameByID: Record<string, string> = {}) {
   let parsedDetails: any = null;
   if (typeof alert.details === 'string') {
     try {
@@ -158,7 +158,8 @@ function mapIncident(alert: any) {
 
   const summary = parsedDetails?.summary || {};
   const technical = parsedDetails?.details || {};
-  const title = summary?.title || alert.title || parsedDetails?.device_name || `Device ${alert.device_id}`;
+  const resolvedDeviceName = deviceNameByID[String(alert.device_id)] || parsedDetails?.device_name || '';
+  const title = resolvedDeviceName || summary?.title || alert.title || `Device ${alert.device_id}`;
   const description =
     summary?.message ||
     parsedDetails?.reason ||
@@ -189,12 +190,18 @@ function mapIncident(alert: any) {
 export const incidentAPI = {
   async list(status?: string) {
     const backendStatus = status === 'resolved' ? 'resolved' : 'active';
+    const devicesRes = await apiRequest('/devices').catch(() => ({ devices: [] }));
+    const deviceNameByID: Record<string, string> = {};
+    for (const d of devicesRes?.devices || []) {
+      if (d?.id != null) deviceNameByID[String(d.id)] = d.hostname || d.name || d.mgmt_ip || `Device ${d.id}`;
+    }
+
     const data = await apiRequest(`/api/alerts?status=${backendStatus}&limit=200`);
-    let incidents = (data?.alerts || []).map(mapIncident);
+    let incidents = (data?.alerts || []).map((a: any) => mapIncident(a, deviceNameByID));
 
     if (!status || status === 'all') {
       const resolvedData = await apiRequest('/api/alerts?status=resolved&limit=200');
-      return { incidents: [...incidents, ...((resolvedData?.alerts || []).map(mapIncident))] };
+      return { incidents: [...incidents, ...((resolvedData?.alerts || []).map((a: any) => mapIncident(a, deviceNameByID)))] };
     }
 
     // Fallback for environments where active alerts are surfaced via overview details.
