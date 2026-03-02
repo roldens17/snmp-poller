@@ -20,9 +20,6 @@ type PollResult struct {
 	PolledAt   time.Time
 }
 
-// ProcessPollResult applies deterministic alert transitions:
-// - 3 consecutive failures => DOWN + active DEVICE_DOWN alert
-// - 2 consecutive successes while DOWN => state UP + resolve active DEVICE_DOWN alert
 func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) error {
 	if result.TenantID == "" || result.DeviceID == "" {
 		return fmt.Errorf("tenant_id and device_id required")
@@ -41,7 +38,6 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Ensure row exists
 	_, err = tx.Exec(ctx, `
 		INSERT INTO device_state (tenant_id, device_id, current_state)
 		VALUES ($1::uuid, $2, 'UNKNOWN')
@@ -77,46 +73,106 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 		lastSuccessAt = &now
 	}
 
+	now := time.Now().UTC()
 	newState := tr.NextState
 	stateChanged := tr.Transition != "none"
-	now := time.Now().UTC()
+
+	kind, summaryTitle, summaryMessage := "", "", ""
+	if !result.Success {
+		kind, summaryTitle, summaryMessage = classifyError(fmt.Errorf("%s", result.Err))
+	}
+	if summaryTitle == "" {
+		summaryTitle = "Device reachable"
+	}
+	if summaryMessage == "" {
+		summaryMessage = "SNMP poll succeeded"
+	}
+
+	summary := map[string]any{
+		"title":                summaryTitle,
+		"message":              summaryMessage,
+		"kind":                 kind,
+		"transport":            "udp",
+		"port":                 161,
+		"snmp_version":         "2c",
+		"last_success_at":      lastSuccessAt,
+		"consecutive_failures": failures,
+		"poll_interval_seconds": 60,
+		"fail_threshold":       3,
+		"clear_threshold":      2,
+	}
+
+	details := map[string]any{
+		"raw_error":      result.Err,
+		"raw_error_full": result.Err,
+		"stack":          "",
+		"debug": map[string]any{
+			"source_ip": "",
+			"target":    fmt.Sprintf("%s:%d", result.DeviceIP, 161),
+			"phase":     "poll",
+			"library":   "gosnmp",
+		},
+	}
+
+	payload := map[string]any{
+		"tenant_id":   result.TenantID,
+		"device_id":   result.DeviceID,
+		"device_name": result.DeviceName,
+		"device_ip":   result.DeviceIP,
+		"summary":     summary,
+		"details":     details,
+		"error":       result.Err, // legacy compatibility
+	}
+
+	payloadJSON, _ := json.Marshal(payload)
+
+	var activeAlertID int64
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM alerts
+		WHERE tenant_id=$1::uuid AND device_id=$2 AND alert_type='DEVICE_DOWN' AND status='active'
+		ORDER BY triggered_at DESC
+		LIMIT 1
+	`, result.TenantID, deviceID).Scan(&activeAlertID)
+	if err != nil {
+		activeAlertID = 0
+	}
 
 	if tr.Transition == "down" {
 		newState = "DOWN"
 		stateChanged = true
-		details := map[string]any{
-			"tenant_id":            result.TenantID,
-			"device_id":            result.DeviceID,
-			"device_name":          result.DeviceName,
-			"device_ip":            result.DeviceIP,
-			"alert_type":           "DEVICE_DOWN",
-			"severity":             "critical",
-			"triggered_at":         now,
-			"last_success_at":      lastSuccessAt,
-			"last_poll_at":         result.PolledAt.UTC(),
-			"consecutive_failures": failures,
-			"error":                result.Err,
-			"retry_policy": map[string]any{
-				"poll_interval_seconds": 60,
-				"fail_threshold":        3,
-				"clear_threshold":       2,
-			},
-		}
-		detailsJSON, _ := json.Marshal(details)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO alerts (tenant_id, device_id, alert_type, severity, title, details, triggered_at, status, last_seen_at, message, category, metadata)
-			VALUES ($1::uuid, $2, 'DEVICE_DOWN', 'critical', 'Device unreachable', $3::jsonb, $4, 'active', $4, 'Device unreachable', 'device_down', $3::jsonb)
+			VALUES ($1::uuid, $2, 'DEVICE_DOWN', 'critical', $3, $4::jsonb, $5, 'active', $5, $6, 'device_down', $4::jsonb)
 			ON CONFLICT DO NOTHING
-		`, result.TenantID, deviceID, string(detailsJSON), now)
+		`, result.TenantID, deviceID, summaryTitle, string(payloadJSON), now, summaryMessage)
 		if err != nil {
 			return err
+		}
+		if activeAlertID == 0 {
+			err = tx.QueryRow(ctx, `
+				SELECT id FROM alerts
+				WHERE tenant_id=$1::uuid AND device_id=$2 AND alert_type='DEVICE_DOWN' AND status='active'
+				ORDER BY triggered_at DESC
+				LIMIT 1
+			`, result.TenantID, deviceID).Scan(&activeAlertID)
+			if err != nil {
+				activeAlertID = 0
+			}
 		}
 	} else if tr.Transition == "up" {
 		newState = "UP"
 		stateChanged = true
+		if activeAlertID > 0 {
+			eventMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": "Device recovered", "consecutive_successes": successes})
+			_, _ = tx.Exec(ctx, `
+				INSERT INTO audit_events (tenant_id, action, resource, resource_id, metadata)
+				VALUES ($1::uuid, 'ALERT_CLEARED', 'alert', $2, $3::jsonb)
+			`, result.TenantID, fmt.Sprintf("%d", activeAlertID), string(eventMeta))
+		}
 		_, err = tx.Exec(ctx, `
 			UPDATE alerts
-			SET status='resolved', resolved_at=$3, last_seen_at=$3
+			SET status='resolved', resolved_at=$3, last_seen_at=$3,
+				details = jsonb_set(COALESCE(details, '{}'::jsonb), '{summary,message}', to_jsonb('Device recovered'::text), true)
 			WHERE tenant_id=$1::uuid AND device_id=$2 AND alert_type='DEVICE_DOWN' AND status='active'
 		`, result.TenantID, deviceID, now)
 		if err != nil {
@@ -126,11 +182,33 @@ func ProcessPollResult(ctx context.Context, db *store.Store, result PollResult) 
 		_, err = tx.Exec(ctx, `
 			UPDATE alerts
 			SET last_seen_at=$3,
-				details=jsonb_set(COALESCE(details,'{}'::jsonb), '{error}', to_jsonb($4::text), true)
+				message=$4,
+				details=$5::jsonb
 			WHERE tenant_id=$1::uuid AND device_id=$2 AND alert_type='DEVICE_DOWN' AND status='active'
-		`, result.TenantID, deviceID, now, result.Err)
+		`, result.TenantID, deviceID, now, summaryMessage, string(payloadJSON))
 		if err != nil {
 			return err
+		}
+	}
+
+	if activeAlertID > 0 {
+		eventType := "POLL_FAILURE"
+		eventMeta := map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures}
+		if result.Success {
+			eventType = "POLL_SUCCESS"
+			eventMeta = map[string]any{"message": "SNMP poll succeeded", "consecutive_successes": successes}
+		}
+		metaJSON, _ := json.Marshal(eventMeta)
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO audit_events (tenant_id, action, resource, resource_id, metadata)
+			VALUES ($1::uuid, $2, 'alert', $3, $4::jsonb)
+		`, result.TenantID, eventType, fmt.Sprintf("%d", activeAlertID), string(metaJSON))
+		if tr.Transition == "down" {
+			triggerMeta, _ := json.Marshal(map[string]any{"kind": kind, "message": summaryMessage, "consecutive_failures": failures})
+			_, _ = tx.Exec(ctx, `
+				INSERT INTO audit_events (tenant_id, action, resource, resource_id, metadata)
+				VALUES ($1::uuid, 'ALERT_TRIGGERED', 'alert', $2, $3::jsonb)
+			`, result.TenantID, fmt.Sprintf("%d", activeAlertID), string(triggerMeta))
 		}
 	}
 

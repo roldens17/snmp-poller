@@ -156,8 +156,11 @@ function mapIncident(alert: any) {
     parsedDetails = alert.details;
   }
 
-  const title = alert.title || parsedDetails?.device_name || `Device ${alert.device_id}`;
+  const summary = parsedDetails?.summary || {};
+  const technical = parsedDetails?.details || {};
+  const title = summary?.title || alert.title || parsedDetails?.device_name || `Device ${alert.device_id}`;
   const description =
+    summary?.message ||
     parsedDetails?.reason ||
     alert.message ||
     alert.details ||
@@ -177,6 +180,8 @@ function mapIncident(alert: any) {
     assignedTo: parsedDetails?.assigned_to || '',
     mutedUntil: parsedDetails?.muted_until || '',
     details: parsedDetails || {},
+    summary,
+    technical,
   };
 }
 

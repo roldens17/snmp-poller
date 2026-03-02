@@ -18,6 +18,7 @@ export function Incidents() {
   const [timelineByIncident, setTimelineByIncident] = useState<Record<string, any[]>>({});
   const [timelineOpen, setTimelineOpen] = useState<Record<string, boolean>>({});
   const [timelineLoading, setTimelineLoading] = useState<Record<string, boolean>>({});
+  const [technicalOpen, setTechnicalOpen] = useState<Record<string, boolean>>({});
   const [assignIncidentId, setAssignIncidentId] = useState<string>('');
   const [assignValue, setAssignValue] = useState('');
   const [muteIncidentId, setMuteIncidentId] = useState<string>('');
@@ -285,7 +286,26 @@ export function Incidents() {
                           </span>
                         </div>
                         
-                        <p className="text-midnight-text-secondary mb-3">{incident.description}</p>
+                        <p className="text-midnight-text-secondary mb-1">{incident.description}</p>
+                        {incident.summary?.kind && (
+                          <div className="text-xs text-midnight-text-secondary mb-2">Type: {incident.summary.kind}</div>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-midnight-text-secondary hover:text-midnight-text-primary px-0 h-auto mb-3"
+                          onClick={() => setTechnicalOpen((prev) => ({ ...prev, [incident.id]: !prev[incident.id] }))}
+                        >
+                          {technicalOpen[incident.id] ? 'Hide Technical details' : 'Technical details'}
+                        </Button>
+                        {technicalOpen[incident.id] && (
+                          <div className="mb-3 rounded-md border border-midnight-border bg-midnight-bg p-3 text-xs">
+                            <div className="text-midnight-text-primary font-medium mb-1">Raw error</div>
+                            <pre className="whitespace-pre-wrap break-words text-midnight-text-secondary">{incident.technical?.raw_error_full || incident.details?.error || 'n/a'}</pre>
+                            <div className="text-midnight-text-primary font-medium mt-2 mb-1">Debug</div>
+                            <pre className="whitespace-pre-wrap break-words text-midnight-text-secondary">{JSON.stringify(incident.technical?.debug || {}, null, 2)}</pre>
+                          </div>
+                        )}
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
@@ -375,6 +395,7 @@ export function Incidents() {
                               {(timelineByIncident[incident.id] || []).map((evt) => (
                                 <div key={evt.id} className="text-sm border-b border-midnight-border pb-2 last:border-0 last:pb-0">
                                   <div className="text-midnight-text-primary font-medium">{evt.action}</div>
+                                  {evt.metadata && <div className="text-midnight-text-secondary text-xs whitespace-pre-wrap">{typeof evt.metadata === 'string' ? evt.metadata : JSON.stringify(evt.metadata)}</div>}
                                   <div className="text-midnight-text-secondary text-xs">
                                     {new Date(evt.created_at).toLocaleString()} • {evt.user_id || 'system'}
                                   </div>
