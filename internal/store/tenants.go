@@ -106,3 +106,14 @@ func (s *Store) UpdateTenantPlan(ctx context.Context, tenantID, planCode, billin
 	_, err := s.pool.Exec(ctx, `UPDATE tenants SET plan_code=$1, billing_status=$2, max_devices=$3, updated_at=now() WHERE id=$4`, planCode, billingStatus, maxDevices, tenantID)
 	return err
 }
+
+
+// UpdateTenantProfile updates editable tenant profile fields.
+func (s *Store) UpdateTenantProfile(ctx context.Context, tenantID, name, slug string) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE tenants
+		SET name=$1, slug=$2, updated_at=now()
+		WHERE id=$3::uuid
+	`, name, slug, tenantID)
+	return err
+}

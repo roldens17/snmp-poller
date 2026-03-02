@@ -166,6 +166,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.GET("/tenants", s.handleListTenants)
 	protected.GET("/tenants/active", s.handleGetActiveTenant)
 	protected.POST("/tenants/active", s.handleSwitchTenant)
+	protected.PATCH("/tenants/active", s.handleUpdateActiveTenant)
 	protected.GET("/tenants/invites", s.handleListInvites)
 	protected.POST("/tenants/invites", s.handleCreateInvite)
 	protected.DELETE("/tenants/invites/:id", s.handleDeleteInvite)

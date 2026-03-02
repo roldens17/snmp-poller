@@ -363,8 +363,11 @@ export const tenantAPI = {
     return { tenant: (data?.tenants || []).find((t: any) => t.id === tenantId) };
   },
 
-  async update(_tenantId: string, _updates: any) {
-    throw new Error('Tenant settings update endpoint is not available in this backend.');
+  async update(_tenantId: string, updates: any) {
+    return apiRequest('/tenants/active', {
+      method: 'PATCH',
+      body: JSON.stringify({ name: updates?.name, slug: updates?.slug }),
+    });
   },
 };
 

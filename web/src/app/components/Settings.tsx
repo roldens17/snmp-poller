@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { authAPI, inviteAPI } from '../lib/api';
+import { authAPI, inviteAPI, tenantAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -18,6 +18,7 @@ export function Settings() {
     alertThreshold: 3,
     retentionDays: 90,
   });
+  const [orgForm, setOrgForm] = useState({ name: '', slug: '' });
 
   const [invites, setInvites] = useState<any[]>([]);
   const [inviteForm, setInviteForm] = useState({ email: '', role: 'viewer', expiresInHours: 72 });
@@ -37,6 +38,7 @@ export function Settings() {
       if (session.tenant?.settings) {
         setSettings(session.tenant.settings);
       }
+      setOrgForm({ name: session.tenant?.name || '', slug: session.tenant?.slug || '' });
 
       const inv = await inviteAPI.list();
       setInvites(inv?.invites || []);
@@ -51,8 +53,17 @@ export function Settings() {
   async function handleSave() {
     if (!tenant) return;
     setSaving(true);
-    toast.info('Tenant settings write endpoint is not available yet in the Go backend.');
-    setSaving(false);
+    try {
+      const res = await tenantAPI.update(tenant.id, { name: orgForm.name, slug: orgForm.slug });
+      const t = res?.tenant || tenant;
+      setTenant(t);
+      setOrgForm({ name: t.name || '', slug: t.slug || '' });
+      toast.success('Organization settings updated');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save organization settings');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleCreateInvite(e: React.FormEvent) {
@@ -180,12 +191,16 @@ export function Settings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Organization Name</Label>
-              <Input value={tenant?.name || ''} disabled />
+              <Input value={orgForm.name} onChange={(e) => setOrgForm(prev => ({ ...prev, name: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Organization ID</Label>
               <Input value={tenant?.id || ''} disabled className="font-mono text-sm" />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Organization Slug</Label>
+            <Input value={orgForm.slug} onChange={(e) => setOrgForm(prev => ({ ...prev, slug: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Owner</Label>
@@ -231,7 +246,7 @@ export function Settings() {
 
           <div className="pt-4">
             <Button onClick={handleSave} disabled={saving} className="bg-midnight-accent text-midnight-text-primary hover:bg-blue-600">
-              {saving ? 'Saving...' : 'Save Settings'}
+              {saving ? 'Saving...' : 'Save Organization'}
             </Button>
           </div>
         </CardContent>
