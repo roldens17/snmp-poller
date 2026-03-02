@@ -26,13 +26,21 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 }
 
 function mapDevice(device: any) {
+  const rawStatus = String(device.status || '').toLowerCase();
+  const normalizedStatus =
+    rawStatus === 'active' || rawStatus === 'up'
+      ? 'up'
+      : rawStatus === 'error' || rawStatus === 'down'
+      ? 'down'
+      : rawStatus || 'unknown';
+
   return {
     ...device,
     name: device.hostname,
     ipAddress: device.mgmt_ip,
     snmpVersion: device.snmp_version,
     lastPolled: device.last_seen,
-    status: device.status === 'active' ? 'up' : device.status,
+    status: normalizedStatus,
   };
 }
 
