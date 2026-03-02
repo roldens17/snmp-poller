@@ -381,10 +381,9 @@ func (s *Service) markDeviceFailure(ctx context.Context, sw config.Switch, pollE
 			log.Warn().Err(err).Str("device", sw.Name).Msg("failed to resolve device id by ip")
 		}
 	}
-	if deviceID > 0 {
-		msg := fmt.Sprintf("%s poll failed: %s", sw.Name, pollErr.Error())
-		s.raiseDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down", "critical", msg)
-	}
+	// Legacy immediate device_down alert path disabled.
+	// We rely on alerts.ProcessPollResult threshold logic (3 fails => DOWN, 2 successes => UP)
+	// to avoid noisy/false one-shot incidents.
 	if deviceID > 0 {
 		_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
 			TenantID:            s.defaultTenantID,
