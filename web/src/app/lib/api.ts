@@ -365,6 +365,13 @@ export const tenantAPI = {
     });
   },
 
+  async switchActive(tenantId: string) {
+    return apiRequest('/tenants/active', {
+      method: 'POST',
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+  },
+
   async get(tenantId: string) {
     const data = await apiRequest('/tenants');
     return { tenant: (data?.tenants || []).find((t: any) => t.id === tenantId) };

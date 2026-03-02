@@ -27,6 +27,8 @@ export function Settings() {
   const [members, setMembers] = useState<any[]>([]);
   const [newTenant, setNewTenant] = useState({ name: '', slug: '' });
   const [creatingTenant, setCreatingTenant] = useState(false);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [switchingTenant, setSwitchingTenant] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -43,9 +45,10 @@ export function Settings() {
       }
       setOrgForm({ name: session.tenant?.name || '', slug: session.tenant?.slug || '' });
 
-      const [inv, mem] = await Promise.all([inviteAPI.list(), tenantMembersAPI.list()]);
+      const [inv, mem, ten] = await Promise.all([inviteAPI.list(), tenantMembersAPI.list(), tenantAPI.list()]);
       setInvites(inv?.invites || []);
       setMembers(mem?.members || []);
+      setTenants(ten?.tenants || []);
     } catch (error: any) {
       console.error('Load settings error:', error);
       toast.error('Failed to load settings');
@@ -121,6 +124,26 @@ export function Settings() {
   }
 
 
+
+  async function handleSwitchTenant(tenantId: string) {
+    if (!tenantId || tenantId === tenant?.id) return;
+    setSwitchingTenant(true);
+    try {
+      const res = await tenantAPI.switchActive(tenantId);
+      const t = res?.tenant;
+      if (t) {
+        setTenant(t);
+        setOrgForm({ name: t.name || '', slug: t.slug || '' });
+      }
+      toast.success('Switched tenant');
+      await loadData();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to switch tenant');
+    } finally {
+      setSwitchingTenant(false);
+    }
+  }
+
   async function handleCreateTenant(e: React.FormEvent) {
     e.preventDefault();
     if (!newTenant.name.trim()) return;
@@ -171,6 +194,31 @@ export function Settings() {
         </Button>
       </div>
 
+
+
+      <Card className="bg-midnight-card border border-midnight-border">
+        <CardHeader>
+          <CardTitle className="text-midnight-text-primary">Active Tenant</CardTitle>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-3 gap-3 items-end">
+          <div className="md:col-span-2 space-y-2">
+            <Label>Switch tenant</Label>
+            <select
+              className="w-full h-10 rounded-md border border-midnight-border bg-midnight-bg px-3 text-sm"
+              value={tenant?.id || ''}
+              onChange={(e) => handleSwitchTenant(e.target.value)}
+              disabled={switchingTenant}
+            >
+              {(tenants || []).map((t) => (
+                <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>
+              ))}
+            </select>
+          </div>
+          <div className="text-xs text-midnight-text-secondary">
+            {switchingTenant ? 'Switching…' : 'Current tenant context for alerts, reports and devices'}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-midnight-card border border-midnight-border">
         <CardHeader>
