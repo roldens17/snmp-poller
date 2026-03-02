@@ -181,6 +181,22 @@ export function Incidents() {
     }
   }
 
+
+  function timelineBadgeClass(action: string) {
+    switch (action) {
+      case 'ALERT_TRIGGERED':
+        return 'bg-midnight-status-critical/15 text-midnight-status-critical border-midnight-status-critical/40';
+      case 'ALERT_CLEARED':
+        return 'bg-midnight-status-success/15 text-midnight-status-success border-midnight-status-success/40';
+      case 'POLL_FAILURE':
+        return 'bg-midnight-status-warning/15 text-midnight-status-warning border-midnight-status-warning/40';
+      case 'POLL_SUCCESS':
+        return 'bg-midnight-accent/15 text-midnight-accent border-midnight-accent/40';
+      default:
+        return 'bg-midnight-bg text-midnight-text-secondary border-midnight-border';
+    }
+  }
+
   function getDuration(startTime: string, endTime: string | null) {
     const start = new Date(startTime);
     const end = endTime ? new Date(endTime) : new Date();
@@ -394,7 +410,7 @@ export function Incidents() {
                             <div className="space-y-2">
                               {(timelineByIncident[incident.id] || []).map((evt) => (
                                 <div key={evt.id} className="text-sm border-b border-midnight-border pb-2 last:border-0 last:pb-0">
-                                  <div className="text-midnight-text-primary font-medium">{evt.action}</div>
+                                  <div className="mb-1">\n                                    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${timelineBadgeClass(evt.action)}`}>{evt.action}</span>\n                                  </div>
                                   {evt.metadata && <div className="text-midnight-text-secondary text-xs whitespace-pre-wrap">{typeof evt.metadata === 'string' ? evt.metadata : JSON.stringify(evt.metadata)}</div>}
                                   <div className="text-midnight-text-secondary text-xs">
                                     {new Date(evt.created_at).toLocaleString()} • {evt.user_id || 'system'}
