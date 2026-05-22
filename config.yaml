@@ -13,8 +13,10 @@ auth:
   token_ttl: 24h
   allow_register: false
 postgres:
-  # Overridden at runtime by the POSTGRES_DSN environment variable
-  dsn: "postgres://user:password@localhost:5432/snmp?sslmode=require"
+  # Required: set the POSTGRES_DSN environment variable at runtime.
+  # This placeholder is intentionally empty so the app fails fast with a
+  # clear error if POSTGRES_DSN is not provided by the environment.
+  dsn: ""
   max_conns: 16
 snmp_defaults:
   community: public
