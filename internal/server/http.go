@@ -26,6 +26,7 @@ import (
 type HTTPServer struct {
 	cfg          *config.Config
 	store        *store.Store
+	userRes      userResolver
 	auth         *auth.Service
 	deviceReg    DeviceRegistrar
 	loginLimiter *IPRateLimiter
@@ -56,6 +57,7 @@ func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
 	return &HTTPServer{
 		cfg:          cfg,
 		store:        db,
+		userRes:      db,
 		auth:         auth.NewService(cfg.Auth),
 		deviceReg:    devicereg.NewService(db, encryptor),
 		loginLimiter: NewIPRateLimiter(rate.Limit(float64(cfg.Auth.LoginRatePerMinute)/60.0), cfg.Auth.LoginBurst),

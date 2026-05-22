@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,35 @@ import (
 	"github.com/fresatu/snmp-poller/internal/auth"
 	"github.com/fresatu/snmp-poller/internal/store"
 )
+
+// userResolver is the minimal store interface required by authRequired.
+// Keeping it narrow lets tests inject a stub without a real database.
+type userResolver interface {
+	GetUserByID(ctx context.Context, id string) (*store.User, error)
+	GetUserTenants(ctx context.Context, userID string) ([]store.Tenant, error)
+	GetTenantByID(ctx context.Context, id string) (*store.Tenant, error)
+	ListAllTenants(ctx context.Context) ([]store.Tenant, error)
+}
+
+// resolveUserTenant enforces the tenant isolation invariant for regular users:
+// a user may only access a tenant they are a member of.
+// Returns the active tenant or an error string suitable for a 403 response.
+func resolveUserTenant(tenants []store.Tenant, requestedID string) (*store.Tenant, string) {
+	if len(tenants) == 0 {
+		return nil, "no active tenant assigned"
+	}
+	if requestedID == "" {
+		t := tenants[0]
+		return &t, ""
+	}
+	for _, t := range tenants {
+		if t.ID == requestedID {
+			result := t
+			return &result, ""
+		}
+	}
+	return nil, "access restricted for this tenant"
+}
 
 // authUserContextKey is used to store the authenticated user.
 const authUserContextKey = "auth_user"
@@ -36,7 +66,6 @@ func toAuthUserResponse(u *store.User) authUserResponse {
 		Role:  u.Role,
 	}
 }
-
 
 func (s *HTTPServer) isSuperAdmin(user *store.User) bool {
 	if user == nil {
@@ -77,7 +106,7 @@ func (s *HTTPServer) setAuthCookie(c *gin.Context, token string, maxAge int) {
 	)
 }
 
-// authRequired middleware ...
+// authRequired middleware validates the session cookie and resolves the active tenant.
 func (s *HTTPServer) authRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cookie, err := c.Cookie(s.auth.CookieName())
@@ -94,7 +123,7 @@ func (s *HTTPServer) authRequired() gin.HandlerFunc {
 			return
 		}
 
-		user, err := s.store.GetUserByID(c.Request.Context(), claims.ID)
+		user, err := s.userRes.GetUserByID(c.Request.Context(), claims.ID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -107,7 +136,7 @@ func (s *HTTPServer) authRequired() gin.HandlerFunc {
 		}
 
 		// Resolve Tenant
-		tenants, err := s.store.GetUserTenants(c.Request.Context(), user.ID)
+		tenants, err := s.userRes.GetUserTenants(c.Request.Context(), user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve tenants"})
 			c.Abort()
@@ -121,13 +150,13 @@ func (s *HTTPServer) authRequired() gin.HandlerFunc {
 
 		if super {
 			if requestedTenantID != "" {
-				t, err := s.store.GetTenantByID(c.Request.Context(), requestedTenantID)
+				t, err := s.userRes.GetTenantByID(c.Request.Context(), requestedTenantID)
 				if err == nil {
 					activeTenant = t
 				}
 			}
 			if activeTenant == nil {
-				all, err := s.store.ListAllTenants(c.Request.Context())
+				all, err := s.userRes.ListAllTenants(c.Request.Context())
 				if err != nil || len(all) == 0 {
 					c.JSON(http.StatusForbidden, gin.H{"error": "no tenants available"})
 					c.Abort()
@@ -136,25 +165,12 @@ func (s *HTTPServer) authRequired() gin.HandlerFunc {
 				activeTenant = &all[0]
 			}
 		} else {
-			if len(tenants) == 0 {
-				c.JSON(http.StatusForbidden, gin.H{"error": "no active tenant assigned"})
+			var errMsg string
+			activeTenant, errMsg = resolveUserTenant(tenants, requestedTenantID)
+			if errMsg != "" {
+				c.JSON(http.StatusForbidden, gin.H{"error": errMsg})
 				c.Abort()
 				return
-			}
-			if requestedTenantID != "" {
-				for _, t := range tenants {
-					if t.ID == requestedTenantID {
-						activeTenant = &t
-						break
-					}
-				}
-				if activeTenant == nil {
-					c.JSON(http.StatusForbidden, gin.H{"error": "access restricted for this tenant"})
-					c.Abort()
-					return
-				}
-			} else {
-				activeTenant = &tenants[0]
 			}
 		}
 
@@ -270,7 +286,6 @@ func (s *HTTPServer) handleAuthMe(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func slugifyTenantName(name string) string {
 	slug := strings.ToLower(strings.TrimSpace(name))
@@ -391,7 +406,6 @@ func (s *HTTPServer) handleAuthRegister(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "user": toAuthUserResponse(user), "tenant_id": assignedTenantID})
 }
-
 
 func (s *HTTPServer) handleAuthRegisterInvite(c *gin.Context) {
 	var req struct {
