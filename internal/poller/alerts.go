@@ -12,19 +12,43 @@ import (
 	"github.com/fresatu/snmp-poller/internal/store"
 )
 
-func (s *Service) evaluateAlerts(ctx context.Context, tenantID string, deviceID int64, pollTime time.Time, metrics []snmpclient.InterfaceMetric, prev map[int]store.InterfaceState, prevCounters map[int]store.InterfaceCounters) {
+// alertAction describes a single raise-or-clear decision returned by computeAlertActions.
+type alertAction struct {
+	ifIndex  int
+	category string
+	action   string // "raise" | "clear"
+	severity string
+	message  string
+}
+
+// computeAlertActions is the pure decision function for per-interface alert
+// evaluation. It has no side effects and is directly unit-testable.
+func computeAlertActions(
+	cfg alertingConfig,
+	pollTime time.Time,
+	metrics []snmpclient.InterfaceMetric,
+	prev map[int]store.InterfaceState,
+	prevCounters map[int]store.InterfaceCounters,
+) []alertAction {
+	var actions []alertAction
 	for _, metric := range metrics {
 		prevState, ok := prev[metric.Index]
 		ifDown := metric.Admin == "up" && metric.Oper != "up"
 		if ifDown && ok {
 			durationDown := pollTime.Sub(prevState.StatusChangedAt)
-			if durationDown >= s.cfg.Alerting.InterfaceDownAfter.Duration && prevState.OperStatus != "" {
-				s.raiseAlert(ctx, tenantID, deviceID, metric.Index, "interface_down", "warning", fmt.Sprintf("%s (%d) down for %s", metric.Name, metric.Index, durationDown.Round(time.Second)))
+			if durationDown >= cfg.InterfaceDownAfter && prevState.OperStatus != "" {
+				actions = append(actions, alertAction{
+					ifIndex:  metric.Index,
+					category: "interface_down",
+					action:   "raise",
+					severity: "warning",
+					message:  fmt.Sprintf("%s (%d) down for %s", metric.Name, metric.Index, durationDown.Round(time.Second)),
+				})
 				continue
 			}
 		}
 		if !ifDown {
-			s.clearAlert(ctx, tenantID, deviceID, metric.Index, "interface_down")
+			actions = append(actions, alertAction{ifIndex: metric.Index, category: "interface_down", action: "clear"})
 		}
 
 		prevCounter, countersOK := prevCounters[metric.Index]
@@ -41,20 +65,56 @@ func (s *Service) evaluateAlerts(ctx context.Context, tenantID string, deviceID 
 		errorDelta := snmpclient.ClampCounter(metric.InErrors, prevCounter.InErrors) + snmpclient.ClampCounter(metric.OutErrors, prevCounter.OutErrors)
 
 		ratio := snmpclient.ErrorRate(errorDelta, octetDelta)
-		if ratio >= s.cfg.Alerting.ErrorRateThreshold && errorDelta > 0 {
-			s.raiseAlert(ctx, tenantID, deviceID, metric.Index, "error_rate", "warning", fmt.Sprintf("%s error rate %.2f%%", metric.Name, ratio*100))
+		if ratio >= cfg.ErrorRateThreshold && errorDelta > 0 {
+			actions = append(actions, alertAction{
+				ifIndex:  metric.Index,
+				category: "error_rate",
+				action:   "raise",
+				severity: "warning",
+				message:  fmt.Sprintf("%s error rate %.2f%%", metric.Name, ratio*100),
+			})
 		} else {
-			s.clearAlert(ctx, tenantID, deviceID, metric.Index, "error_rate")
+			actions = append(actions, alertAction{ifIndex: metric.Index, category: "error_rate", action: "clear"})
 		}
 
 		if metric.Speed > 0 && timeDelta > 0 && octetDelta > 0 {
 			bps := snmpclient.BitsPerSecond(octetDelta, timeDelta)
-			threshold := float64(metric.Speed) * s.cfg.Alerting.BandwidthThreshold
+			threshold := float64(metric.Speed) * cfg.BandwidthThreshold
 			if bps >= threshold {
-				s.raiseAlert(ctx, tenantID, deviceID, metric.Index, "bandwidth", "info", fmt.Sprintf("%s %.2f%% utilization", metric.Name, (bps/float64(metric.Speed))*100))
+				actions = append(actions, alertAction{
+					ifIndex:  metric.Index,
+					category: "bandwidth",
+					action:   "raise",
+					severity: "info",
+					message:  fmt.Sprintf("%s %.2f%% utilization", metric.Name, (bps/float64(metric.Speed))*100),
+				})
 			} else {
-				s.clearAlert(ctx, tenantID, deviceID, metric.Index, "bandwidth")
+				actions = append(actions, alertAction{ifIndex: metric.Index, category: "bandwidth", action: "clear"})
 			}
+		}
+	}
+	return actions
+}
+
+// alertingConfig holds the thresholds used by computeAlertActions.
+type alertingConfig struct {
+	InterfaceDownAfter time.Duration
+	ErrorRateThreshold float64
+	BandwidthThreshold float64
+}
+
+func (s *Service) evaluateAlerts(ctx context.Context, tenantID string, deviceID int64, pollTime time.Time, metrics []snmpclient.InterfaceMetric, prev map[int]store.InterfaceState, prevCounters map[int]store.InterfaceCounters) {
+	cfg := alertingConfig{
+		InterfaceDownAfter: s.cfg.Alerting.InterfaceDownAfter.Duration,
+		ErrorRateThreshold: s.cfg.Alerting.ErrorRateThreshold,
+		BandwidthThreshold: s.cfg.Alerting.BandwidthThreshold,
+	}
+	for _, a := range computeAlertActions(cfg, pollTime, metrics, prev, prevCounters) {
+		switch a.action {
+		case "raise":
+			s.raiseAlert(ctx, tenantID, deviceID, a.ifIndex, a.category, a.severity, a.message)
+		case "clear":
+			s.clearAlert(ctx, tenantID, deviceID, a.ifIndex, a.category)
 		}
 	}
 }
