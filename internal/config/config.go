@@ -386,6 +386,19 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); v != "" {
 		c.Postgres.DSN = v
+	} else {
+		// Fall back to building the DSN from individual component variables.
+		// This is necessary on Railway, where reference variable interpolation
+		// inside string values is not supported — only direct variable references work.
+		pgUser := strings.TrimSpace(os.Getenv("POSTGRES_USER"))
+		pgPassword := strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD"))
+		pgDB := strings.TrimSpace(os.Getenv("POSTGRES_DB"))
+		if pgUser != "" && pgPassword != "" && pgDB != "" {
+			c.Postgres.DSN = fmt.Sprintf(
+				"postgres://%s:%s@postgres.railway.internal:5432/%s?sslmode=require",
+				pgUser, pgPassword, pgDB,
+			)
+		}
 	}
 	if v := os.Getenv("POSTGRES_MAX_CONNS"); v != "" {
 		if i, err := strconv.Atoi(v); err == nil && i > 0 {
