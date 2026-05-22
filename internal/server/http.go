@@ -181,7 +181,9 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.PATCH("/tenants/members/:userId", s.handleUpdateTenantMemberRole)
 	protected.DELETE("/tenants/members/:userId", s.handleRemoveTenantMember)
 
-	log.Info().Bool("demo_mode", s.cfg.DemoMode).Msg("server config")
+	if s.cfg.DemoMode {
+		log.Warn().Msg("DEMO_MODE is enabled — seed/reset endpoints are active; disable before production use")
+	}
 
 	if s.cfg.DemoMode {
 		protected.POST("/demo/seed", s.handleDemoSeed)

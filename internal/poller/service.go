@@ -260,7 +260,7 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID st
 		}
 		deviceID, upsertErr := s.store.UpsertDevice(ctx, device)
 		if upsertErr == nil {
-			_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
+			if err := alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
 				TenantID:            s.defaultTenantID,
 				DeviceID:            fmt.Sprintf("%d", deviceID),
 				DeviceName:          sw.Name,
@@ -272,7 +272,9 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID st
 				PollIntervalSeconds: int(s.cfg.PollInterval.Duration / time.Second),
 				FailThreshold:       3,
 				ClearThreshold:      2,
-			})
+			}); err != nil {
+				logger.Warn().Err(err).Str("device", sw.Name).Msg("process poll result failed")
+			}
 		}
 		return nil
 	}
@@ -374,7 +376,7 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID st
 	}
 	s.clearDeviceAlert(ctx, s.defaultTenantID, deviceID, "device_down")
 	s.evaluateAlerts(ctx, s.defaultTenantID, deviceID, pollTime, ifaces, prevStates, prevCounters)
-	_ = alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
+	if err := alerts.ProcessPollResult(ctx, s.store, alerts.PollResult{
 		TenantID:            s.defaultTenantID,
 		DeviceID:            fmt.Sprintf("%d", deviceID),
 		DeviceName:          sw.Name,
@@ -386,7 +388,9 @@ func (s *Service) pollDevice(ctx context.Context, sw config.Switch, requestID st
 		PollIntervalSeconds: int(s.cfg.PollInterval.Duration / time.Second),
 		FailThreshold:       3,
 		ClearThreshold:      2,
-	})
+	}); err != nil {
+		logger.Warn().Err(err).Str("device", sw.Name).Msg("process poll result failed")
+	}
 	return nil
 }
 
