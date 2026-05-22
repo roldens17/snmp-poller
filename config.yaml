@@ -1,0 +1,38 @@
+poll_interval: 1m
+worker_count: 6
+poller_device_limit: 0
+http:
+  addr: ":8080"
+  allowed_origins:
+    - "http://localhost:3000"
+auth:
+  # Override at runtime via AUTH_JWT_SECRET env var
+  jwt_secret: "replace-me-via-AUTH_JWT_SECRET-env-var"
+  cookie_name: "snmpai_session"
+  cookie_secure: false
+  token_ttl: 24h
+  allow_register: false
+postgres:
+  # Overridden at runtime by the POSTGRES_DSN environment variable
+  dsn: "postgres://user:password@localhost:5432/snmp?sslmode=require"
+  max_conns: 16
+snmp_defaults:
+  community: public
+  version: "2c"
+  port: 161
+  timeout: 5s
+  retries: 2
+switches: []
+discovery:
+  enabled: true
+  subnets: []
+  worker_count: 16
+  timeout: 2s
+  interval: 30m
+alerts:
+  interface_down_after: 2m
+  error_rate_threshold: 0.02
+  bandwidth_threshold: 0.8
+metrics:
+  enabled: true
+  addr: ":9105"
