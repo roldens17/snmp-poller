@@ -17,15 +17,14 @@ type Duration struct {
 }
 
 // UnmarshalYAML parses values such as "5s" or "1m30s" into a duration.
+// Bare integers are treated as nanoseconds.
 func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var raw string
 	if err := value.Decode(&raw); err == nil {
-		dur, err := time.ParseDuration(raw)
-		if err != nil {
-			return err
+		if dur, err := time.ParseDuration(raw); err == nil {
+			d.Duration = dur
+			return nil
 		}
-		d.Duration = dur
-		return nil
 	}
 
 	var asInt int64

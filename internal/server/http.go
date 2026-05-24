@@ -26,6 +26,7 @@ import (
 type HTTPServer struct {
 	cfg          *config.Config
 	store        *store.Store
+	userRes      userResolver
 	auth         *auth.Service
 	deviceReg    DeviceRegistrar
 	loginLimiter *IPRateLimiter
@@ -56,6 +57,7 @@ func NewHTTPServer(cfg *config.Config, db *store.Store) *HTTPServer {
 	return &HTTPServer{
 		cfg:          cfg,
 		store:        db,
+		userRes:      db,
 		auth:         auth.NewService(cfg.Auth),
 		deviceReg:    devicereg.NewService(db, encryptor),
 		loginLimiter: NewIPRateLimiter(rate.Limit(float64(cfg.Auth.LoginRatePerMinute)/60.0), cfg.Auth.LoginBurst),
@@ -179,7 +181,9 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	protected.PATCH("/tenants/members/:userId", s.handleUpdateTenantMemberRole)
 	protected.DELETE("/tenants/members/:userId", s.handleRemoveTenantMember)
 
-	log.Info().Bool("demo_mode", s.cfg.DemoMode).Msg("server config")
+	if s.cfg.DemoMode {
+		log.Warn().Msg("DEMO_MODE is enabled — seed/reset endpoints are active; disable before production use")
+	}
 
 	if s.cfg.DemoMode {
 		protected.POST("/demo/seed", s.handleDemoSeed)

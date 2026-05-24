@@ -13,15 +13,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// deliveryRecorder is the minimal store interface needed by sendWebhook.
+type deliveryRecorder interface {
+	RecordAlertDelivery(ctx context.Context, d store.AlertDelivery) error
+}
+
 // Service handles dispatching notifications.
 type Service struct {
 	store            *store.Store
 	dashboardBaseURL string
+	initialBackoff   time.Duration // overridable in tests; defaults to 1s
 }
 
 // NewService creates a notification service.
 func NewService(db *store.Store, dashboardBaseURL string) *Service {
-	return &Service{store: db, dashboardBaseURL: dashboardBaseURL}
+	return &Service{store: db, dashboardBaseURL: dashboardBaseURL, initialBackoff: time.Second}
 }
 
 // EventType defines alert lifecycle events.
@@ -58,23 +64,13 @@ type LinksInfo struct {
 	Dashboard string `json:"dashboard"`
 }
 
-// Dispatch sends notifications for a specific alert event.
-func (s *Service) Dispatch(ctx context.Context, tenantID string, event EventType, alert store.Alert) {
-	dests, err := s.store.ListEnabledAlertDestinations(ctx, tenantID)
-	if err != nil {
-		log.Error().Err(err).Str("tenant_id", tenantID).Msg("failed to list alert destinations for dispatch")
-		return
-	}
-	if len(dests) == 0 {
-		return
-	}
-
-	dashboardURL := s.dashboardBaseURL
+// buildPayload constructs the webhook payload for an alert event.
+func buildPayload(dashboardURL, tenantID string, event EventType, alert store.Alert) WebhookPayload {
 	if dashboardURL == "" {
 		dashboardURL = "http://localhost:3000"
 	}
 	text := "[" + string(event) + "] Device " + fmt.Sprintf("%d", alert.DeviceID) + " - " + alert.Message
-	payload := WebhookPayload{
+	return WebhookPayload{
 		Text:   text,
 		Tenant: TenantInfo{ID: tenantID},
 		Event:  event,
@@ -88,18 +84,31 @@ func (s *Service) Dispatch(ctx context.Context, tenantID string, event EventType
 		},
 		Links: LinksInfo{Dashboard: dashboardURL + "/alerts"},
 	}
+}
 
+// Dispatch sends notifications for a specific alert event.
+func (s *Service) Dispatch(ctx context.Context, tenantID string, event EventType, alert store.Alert) {
+	dests, err := s.store.ListEnabledAlertDestinations(ctx, tenantID)
+	if err != nil {
+		log.Error().Err(err).Str("tenant_id", tenantID).Msg("failed to list alert destinations for dispatch")
+		return
+	}
+	if len(dests) == 0 {
+		return
+	}
+
+	payload := buildPayload(s.dashboardBaseURL, tenantID, event, alert)
 	body, _ := json.Marshal(payload)
 	for _, d := range dests {
-		go s.sendWebhook(ctx, tenantID, event, alert.ID, d, body)
+		go s.sendWebhook(ctx, tenantID, event, alert.ID, d, body, s.store)
 	}
 }
 
-func (s *Service) sendWebhook(ctx context.Context, tenantID string, event EventType, alertID int64, dest store.AlertDestination, body []byte) {
+func (s *Service) sendWebhook(ctx context.Context, tenantID string, event EventType, alertID int64, dest store.AlertDestination, body []byte, recorder deliveryRecorder) {
 	client := http.Client{Timeout: 8 * time.Second}
 
 	const maxAttempts = 5
-	backoff := 1 * time.Second
+	backoff := s.initialBackoff
 
 	for i := 1; i <= maxAttempts; i++ {
 		start := time.Now()
@@ -107,7 +116,7 @@ func (s *Service) sendWebhook(ctx context.Context, tenantID string, event EventT
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.URL, bytes.NewReader(body))
 		if err != nil {
 			log.Error().Err(err).Str("url", dest.URL).Msg("failed to create webhook request")
-			_ = s.store.RecordAlertDelivery(ctx, store.AlertDelivery{
+			_ = recorder.RecordAlertDelivery(ctx, store.AlertDelivery{
 				TenantID:      tenantID,
 				DestinationID: dest.ID,
 				AlertID:       alertID,
@@ -141,10 +150,7 @@ func (s *Service) sendWebhook(ctx context.Context, tenantID string, event EventT
 		}
 
 		sc := statusCode
-		if statusCode == 0 {
-			sc = 0
-		}
-		_ = s.store.RecordAlertDelivery(ctx, store.AlertDelivery{
+		_ = recorder.RecordAlertDelivery(ctx, store.AlertDelivery{
 			TenantID:      tenantID,
 			DestinationID: dest.ID,
 			AlertID:       alertID,

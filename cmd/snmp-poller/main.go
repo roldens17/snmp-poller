@@ -62,6 +62,6 @@ func main() {
 	<-ctx.Done()
 	log.Info().Msg("shutting down snmp-poller")
 
-	// Small grace period
-	time.Sleep(2 * time.Second)
+	// Grace period: allow in-flight HTTP requests (5s shutdown) and SNMP walks (≤6s) to finish.
+	time.Sleep(10 * time.Second)
 }

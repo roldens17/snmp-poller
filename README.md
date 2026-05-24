@@ -2,6 +2,57 @@
 
 Production-ready Go service that polls network switches via SNMP v2c, stores state in PostgreSQL, exposes a REST API + optional Prometheus metrics, and can probe predefined subnets for new devices.
 
+## Prerequisites
+
+- **Docker + Docker Compose v2** (for the recommended setup)
+- Go 1.21+ (only for local development without Docker)
+- Node.js 20+ (only for frontend development)
+
+## Quick Start (5 minutes)
+
+```sh
+# 1. Copy environment defaults
+cp .env.example .env
+
+# 2. Set a strong JWT secret (required — app won't start without it)
+#    Replace the placeholder in .env:
+#    AUTH_JWT_SECRET=replace_me_with_a_random_32_char_string
+
+# 3. Start all services
+docker compose up -d
+
+# 4. Create your first admin account (see DEPLOYMENT.md for options)
+#    Fastest: set AUTH_ALLOW_REGISTER=true in .env, restart, then POST /auth/register
+
+# 5. Open the dashboard
+open http://localhost:3000
+```
+
+> **No network devices yet?** Enable demo mode (see below) to explore the UI with realistic data before connecting real switches.
+
+## Try the Demo (no devices required)
+
+```sh
+# 1. Enable demo mode in .env
+echo "DEMO_MODE=true" >> .env
+
+# 2. Restart
+docker compose up -d
+
+# 3. Log in, then seed demo data
+curl -X POST http://localhost:8080/demo/seed \
+  -H "Cookie: snmpai_session=<your-token>"
+# → creates 3 tenants with devices, interfaces, MAC tables, and active alerts
+
+# 4. Explore the dashboard at http://localhost:3000
+
+# 5. Reset and start fresh anytime
+curl -X POST http://localhost:8080/demo/reset \
+  -H "Cookie: snmpai_session=<your-token>"
+```
+
+> Disable `DEMO_MODE` before going to production — the seed/reset endpoints are not protected beyond authentication.
+
 ## Features
 - Configurable worker pool polling enabled devices every 60 seconds (default) with per-device SNMP timeout/retries.
 - Postgres schema for devices, current interface state, time-series counters, MAC address tables, alerts, and discovery attempts (see `migrations/`).
