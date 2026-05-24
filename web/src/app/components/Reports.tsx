@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
 import { reportsAPI } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -75,8 +77,8 @@ export function Reports() {
       `Incidents: ${sla.incidents_count}\n` +
       `Avg MTTR: ${Number(sla.avg_resolve_minutes).toFixed(1)}m\n\n` +
       `Export links:\n` +
-      `${window.location.origin}/api/reports/sla.csv\n` +
-      `${window.location.origin}/api/reports/incidents.csv\n`
+      `${API_BASE}/reports/sla.csv\n` +
+      `${API_BASE}/reports/incidents.csv\n`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   }
