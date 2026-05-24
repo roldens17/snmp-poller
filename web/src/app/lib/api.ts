@@ -1,5 +1,4 @@
-const envApiBase = import.meta.env.VITE_API_BASE_URL;
-const API_BASE = (envApiBase ?? '/api').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const headers: Record<string, string> = {
@@ -7,7 +6,7 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string>),
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers,
@@ -452,11 +451,11 @@ export const reportsAPI = {
   },
 
   downloadSLAcsv() {
-    window.open(`${API_BASE}/reports/sla.csv`, '_blank');
+    window.open(`${API_BASE_URL}/reports/sla.csv`, '_blank');
   },
 
   downloadIncidentsCSV() {
-    window.open(`${API_BASE}/reports/incidents.csv`, '_blank');
+    window.open(`${API_BASE_URL}/reports/incidents.csv`, '_blank');
   },
 
   async getUptimeReport(days = 30, _deviceId?: string) {
